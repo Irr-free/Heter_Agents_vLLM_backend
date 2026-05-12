@@ -3902,26 +3902,6 @@ class GPUModelRunner(
                 num_encoder_reqs=len(scheduler_output.scheduled_encoder_inputs),
             )
 
-            # 异构系统：Pure Decode Batch 强制降级为 EAGER 模式
-            # CPU Attention 无法被 CUDA Graph 捕获
-            # 调试：记录 num_scheduled_tokens_np 的值
-            try:
-                with open("/tmp/vllm_execute_model_debug.log", "a") as f:
-                    f.write(f"cudagraph_mode={cudagraph_mode}, num_scheduled={num_scheduled_tokens_np.tolist()}, all_one={np.all(num_scheduled_tokens_np == 1)}\n")
-            except Exception:
-                pass
-            if cudagraph_mode != CUDAGraphMode.NONE:
-                # num_scheduled_tokens_np 中所有值均为 1 表示 pure decode
-                if np.all(num_scheduled_tokens_np == 1):
-                    cudagraph_mode = CUDAGraphMode.NONE
-                    from dataclasses import replace as dc_replace
-                    batch_desc = dc_replace(batch_desc, num_tokens=batch_desc.num_tokens)
-                    try:
-                        with open("/tmp/vllm_execute_model_debug.log", "a") as f:
-                            f.write("  -> 降级为 EAGER\n")
-                    except Exception:
-                        pass
-
             logger.debug(
                 "Running batch with cudagraph_mode: %s, batch_descriptor: %s, "
                 "should_ubatch: %s, num_tokens_across_dp: %s",

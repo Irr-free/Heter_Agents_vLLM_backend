@@ -9,7 +9,6 @@ import torch.nn as nn
 import vllm.envs as envs
 from vllm.config import CacheConfig, get_current_vllm_config
 from vllm.config.vllm import VllmConfig
-from vllm.compilation.monitor import is_cudagraph_capturing
 from vllm.forward_context import ForwardContext, get_forward_context
 from vllm.logger import init_logger
 from vllm.model_executor.layers.attention.kv_transfer_utils import (
@@ -175,176 +174,6 @@ def _init_kv_cache_quant(
         layer.quant_method.create_weights(layer)
 
 
-# =============================================================================
-# 异构系统：CPU Paged Attention Python Fallback（用于 GPU 构建环境快速验证）
-# =============================================================================
-
-def _cpu_attn_reshape_and_cache_fallback(
-    key: torch.Tensor,
-    value: torch.Tensor,
-    key_cache: torch.Tensor,
-    value_cache: torch.Tensor,
-    slot_mapping: torch.Tensor,
-) -> None:
-    """Python fallback for cpu_attn_reshape_and_cache.
-    Layout: [num_blocks, num_kv_heads, block_size, head_size]
-    """
-    block_size = key_cache.shape[2]
-    for i, slot in enumerate(slot_mapping):
-        slot_val = int(slot.item())
-        if slot_val < 0:
-            continue
-        block_idx = slot_val // block_size
-        block_offset = slot_val % block_size
-        key_cache[block_idx, :, block_offset, :] = key[i]
-        value_cache[block_idx, :, block_offset, :] = value[i]
-
-
-# 全局标记文件路径，用于端到端测试验证 Decode CPU Attention 是否被执行
-_CPU_ATTENTION_EXECUTED_FLAG = "/tmp/vllm_cpu_attention_executed.flag"
-
-
-def _cpu_paged_attention_fallback(
-    query: torch.Tensor,
-    key_cache: torch.Tensor,
-    value_cache: torch.Tensor,
-    output: torch.Tensor,
-    query_start_loc: torch.Tensor,
-    seq_lens: torch.Tensor,
-    scale: float,
-    causal: bool,
-    alibi_slopes: torch.Tensor,
-    sliding_window_left: int,
-    sliding_window_right: int,
-    block_table: torch.Tensor,
-    softcap: float,
-    scheduler_metadata: torch.Tensor,
-    s_aux: torch.Tensor,
-) -> None:
-    """Python fallback for cpu_attention_with_kv_cache.
-    简化版 Paged Attention，使用 PyTorch 原生 ops 在 CPU 上执行。
-    性能远低于 C++ kernel，但足以验证异构流程的正确性。
-    """
-    # 创建标记文件，供端到端测试验证 Decode 确实走了 CPU 路径
-    try:
-        with open(_CPU_ATTENTION_EXECUTED_FLAG, "w") as f:
-            f.write("1")
-    except Exception:
-        pass
-
-    num_heads = query.shape[1]
-    num_kv_heads = key_cache.shape[1]
-    head_size = query.shape[2]
-    block_size = key_cache.shape[2]
-    num_queries_per_kv = num_heads // num_kv_heads
-    num_seqs = len(seq_lens)
-
-    for seq_idx in range(num_seqs):
-        q_start = int(query_start_loc[seq_idx].item())
-        q_end = int(query_start_loc[seq_idx + 1].item())
-        seq_len = int(seq_lens[seq_idx].item())
-
-        # 收集该序列的 block
-        blocks = block_table[seq_idx]
-        valid_blocks = []
-        for b in blocks:
-            b_val = int(b.item())
-            if b_val >= 0:
-                valid_blocks.append(b_val)
-            else:
-                break
-
-        if not valid_blocks:
-            continue
-
-        # 从 block cache 中拼接出该序列的 K/V
-        k_list = [key_cache[b] for b in valid_blocks]   # each: [num_kv_heads, block_size, head_size]
-        v_list = [value_cache[b] for b in valid_blocks]
-        k_seq = torch.cat(k_list, dim=1)[:, :seq_len, :]  # [num_kv_heads, seq_len, head_size]
-        v_seq = torch.cat(v_list, dim=1)[:, :seq_len, :]  # [num_kv_heads, seq_len, head_size]
-
-        # GQA: repeat_interleave K/V 到 num_heads
-        k_seq = k_seq.repeat_interleave(num_queries_per_kv, dim=0)  # [num_heads, seq_len, head_size]
-        v_seq = v_seq.repeat_interleave(num_queries_per_kv, dim=0)  # [num_heads, seq_len, head_size]
-
-        q_seq = query[q_start:q_end]  # [num_query_tokens, num_heads, head_size]
-
-        # Attention scores: [num_query_tokens, num_heads, seq_len]
-        scores = torch.einsum('qhd,hkd->qhk', q_seq, k_seq) * scale
-
-        # Causal mask
-        # 注意：当 q_seq.shape[0] == 1 时为典型 Decode 阶段，query 是序列最后一个
-        # token，应能看到全部历史，因此跳过 causal mask。
-        if causal and q_seq.shape[0] > 1:
-            global_q_start = q_start
-            for qi in range(q_seq.shape[0]):
-                global_q_pos = global_q_start + qi
-                if global_q_pos < seq_len:
-                    scores[qi, :, global_q_pos + 1:] = float('-inf')
-                else:
-                    scores[qi, :, :] = float('-inf')
-
-        # Sliding window mask
-        if sliding_window_left >= 0:
-            for qi in range(q_seq.shape[0]):
-                global_q_pos = q_start + qi
-                left_bound = max(0, global_q_pos - sliding_window_left)
-                if left_bound > 0:
-                    scores[qi, :, :left_bound] = float('-inf')
-        if sliding_window_right >= 0:
-            for qi in range(q_seq.shape[0]):
-                global_q_pos = q_start + qi
-                right_bound = min(seq_len, global_q_pos + sliding_window_right + 1)
-                if right_bound < seq_len:
-                    scores[qi, :, right_bound:] = float('-inf')
-
-        # Softcap
-        if softcap != 0.0:
-            scores = softcap * torch.tanh(scores / softcap)
-
-        # ALiBi
-        if alibi_slopes.numel() > 0:
-            positions = torch.arange(seq_len, dtype=scores.dtype, device=scores.device)
-            for h in range(num_heads):
-                scores[:, h, :] += alibi_slopes[h].item() * positions.unsqueeze(0)
-
-        # Softmax
-        scores = torch.softmax(scores, dim=-1)
-
-        # Output: [num_query_tokens, num_heads, head_size]
-        out_seq = torch.einsum('qhk,hkd->qhd', scores, v_seq)
-        output[q_start:q_end] = out_seq
-
-
-def _cpu_paged_attention_fallback_fake(
-    query: torch.Tensor,
-    key_cache: torch.Tensor,
-    value_cache: torch.Tensor,
-    output: torch.Tensor,
-    query_start_loc: torch.Tensor,
-    seq_lens: torch.Tensor,
-    scale: float,
-    causal: bool,
-    alibi_slopes: torch.Tensor,
-    sliding_window_left: int,
-    sliding_window_right: int,
-    block_table: torch.Tensor,
-    softcap: float,
-    scheduler_metadata: torch.Tensor,
-    s_aux: torch.Tensor,
-) -> None:
-    pass
-
-
-direct_register_custom_op(
-    "cpu_paged_attention_fallback",
-    _cpu_paged_attention_fallback,
-    mutates_args=["output"],
-    fake_impl=_cpu_paged_attention_fallback_fake,
-    dispatch_key="CPU",
-)
-
-
 class Attention(nn.Module, AttentionLayerBase):
     """Attention layer.
 
@@ -456,11 +285,8 @@ class Attention(nn.Module, AttentionLayerBase):
         self.head_size = head_size
         self.head_size_v = self.head_size if head_size_v is None else head_size_v
         self.num_kv_heads = num_kv_heads
-        self.scale = scale
         self.sliding_window = sliding_window
-        self.logits_soft_cap = logits_soft_cap
-        self.sinks = extra_impl_args.get("sinks")
-        self.has_sink = self.sinks is not None
+        self.has_sink = extra_impl_args.get("sinks") is not None
 
         # NOTE: model_config may be None during certain tests
         model_config = vllm_config.model_config
@@ -584,10 +410,6 @@ class Attention(nn.Module, AttentionLayerBase):
                 else GroupShape.PER_TENSOR,
             )
 
-        # 异构系统：CPU KV Cache（主存）占位符，延迟初始化
-        self.cpu_kv_cache: torch.Tensor | None = None
-        self._d2h_stream: torch.cuda.Stream | None = None
-
     def _init_turboquant_buffers(
         self, cache_dtype: str, head_size: int, prefix: str
     ) -> None:
@@ -684,16 +506,9 @@ class Attention(nn.Module, AttentionLayerBase):
             key = key.view(-1, self.num_kv_heads, self.head_size)
         if value is not None:
             value = value.view(-1, self.num_kv_heads, self.head_size_v)
-        # 异构系统：Prefill 阶段完成后触发 async D2H
-        forward_ctx = get_forward_context()
-        attn_metadata = forward_ctx.attn_metadata if forward_ctx is not None else None
-        num_prefill_tokens = getattr(attn_metadata, 'num_prefill_tokens', 0) if attn_metadata is not None else 0
-        if num_prefill_tokens > 0:
-            self._prefill_kv_to_cpu_async()
-
-        # ==================== 统一通过 custom op 调用 attention ====================
         kv_cache_dummy_dep = None
         if self.use_direct_call:
+            # Skip this if sharing KV cache with an earlier attention layer.
             if (
                 not self.attn_backend.forward_includes_kv_cache_update
                 and self.kv_sharing_target_layer_name is None
@@ -712,6 +527,7 @@ class Attention(nn.Module, AttentionLayerBase):
                 kv_cache_dummy_dep=kv_cache_dummy_dep,
             )
         else:
+            # Skip this if sharing KV cache with an earlier attention layer.
             encoded = _encode_layer_name(self.layer_name)
             if (
                 not self.attn_backend.forward_includes_kv_cache_update
@@ -730,150 +546,7 @@ class Attention(nn.Module, AttentionLayerBase):
                 encoded,
                 kv_cache_dummy_dep=kv_cache_dummy_dep,
             )
-
         return output.view(-1, hidden_size)
-
-    # =================================================================
-    # 以下方法为 CPU-GPU 异构系统新增
-    # =================================================================
-
-    def init_cpu_kv_cache(self) -> None:
-        """初始化 CPU 主存 KV Cache，由 bind_kv_cache 调用。"""
-        if self.kv_cache is None:
-            return
-        gpu_cache = self.kv_cache  # GPU Tensor, layout: [2, num_blocks, block_size, num_kv_heads, head_size]
-        num_blocks = gpu_cache.shape[1]
-        block_size = gpu_cache.shape[2]
-        # 如果已存在且 shape 匹配，直接复用（避免重复分配）
-        if self.cpu_kv_cache is not None:
-            if (self.cpu_kv_cache.shape[1] == num_blocks and
-                    self.cpu_kv_cache.shape[3] == block_size):
-                return
-            # shape 不匹配（例如 profile run 后换成了真正的 KV cache），释放旧的
-            self.cpu_kv_cache = None
-            self._d2h_stream = None
-        # CPU layout: [2, num_blocks, num_kv_heads, block_size, head_size]
-        cpu_shape = (2, num_blocks, self.num_kv_heads, block_size, self.head_size)
-        self.cpu_kv_cache = torch.empty(
-            cpu_shape,
-            dtype=gpu_cache.dtype,
-            device='cpu',
-            pin_memory=True,
-        )
-        self._d2h_stream = torch.cuda.Stream(device=gpu_cache.device)
-
-    def _prefill_kv_to_cpu_async(self) -> None:
-        """Prefill 阶段结束后，将该层 GPU KV Cache 异步搬运到 CPU Cache。"""
-        if self.cpu_kv_cache is None or self._d2h_stream is None:
-            return
-        gpu_k = self.kv_cache[0]  # [num_blocks, block_size, num_kv_heads, head_size]
-        gpu_v = self.kv_cache[1]
-        cpu_k = self.cpu_kv_cache[0]  # [num_blocks, num_kv_heads, block_size, head_size]
-        cpu_v = self.cpu_kv_cache[1]
-        with torch.cuda.stream(self._d2h_stream):
-            # GPU layout -> CPU layout: 交换 block_size 和 num_kv_heads 维度
-            cpu_k.copy_(gpu_k.permute(0, 2, 1, 3), non_blocking=True)
-            cpu_v.copy_(gpu_v.permute(0, 2, 1, 3), non_blocking=True)
-
-    def _decode_kv_to_cpu(
-        self,
-        key: torch.Tensor,
-        value: torch.Tensor,
-        slot_mapping: torch.Tensor,
-    ) -> None:
-        """Decode 阶段，将新生成的 K/V 写入 CPU Paged Cache。"""
-        assert self.cpu_kv_cache is not None
-        key_cpu = key.to('cpu', non_blocking=False)
-        value_cpu = value.to('cpu', non_blocking=False)
-        slot_mapping_cpu = slot_mapping.to('cpu', non_blocking=False)
-        cpu_k_cache, cpu_v_cache = self.cpu_kv_cache.unbind(0)
-        # 调用 vLLM CPU 版本的 KV Cache 写入 kernel
-        if hasattr(torch.ops._C, 'cpu_attn_reshape_and_cache'):
-            torch.ops._C.cpu_attn_reshape_and_cache(
-                key_cpu, value_cpu,
-                cpu_k_cache, cpu_v_cache,
-                slot_mapping_cpu,
-                "vec",  # TODO: 根据 CPU 平台动态选择 isa
-            )
-        else:
-            # Fallback：Python 直接写入（性能较低，但无需编译 CPU 扩展）
-            logger.info("【异构系统】Decode KV to CPU — Python Fallback 执行中")
-            _cpu_attn_reshape_and_cache_fallback(
-                key_cpu, value_cpu, cpu_k_cache, cpu_v_cache, slot_mapping_cpu
-            )
-
-    def _build_cpu_metadata(self, attn_metadata) -> dict:
-        """将 GPU attn_metadata 中的关键 tensor 搬到 CPU，供 CPU Attention kernel 使用。"""
-        cpu_meta = {
-            'query_start_loc': attn_metadata.query_start_loc.cpu(),
-            'seq_lens': attn_metadata.seq_lens.cpu(),
-            'block_table': attn_metadata.block_table.cpu(),
-            'causal': attn_metadata.causal,
-        }
-        if hasattr(attn_metadata, 'alibi_slopes') and attn_metadata.alibi_slopes is not None:
-            cpu_meta['alibi_slopes'] = attn_metadata.alibi_slopes.cpu()
-        else:
-            cpu_meta['alibi_slopes'] = None
-        if hasattr(attn_metadata, 'scheduler_metadata') and attn_metadata.scheduler_metadata is not None:
-            cpu_meta['scheduler_metadata'] = attn_metadata.scheduler_metadata.cpu()
-        else:
-            cpu_meta['scheduler_metadata'] = torch.empty(0)
-        return cpu_meta
-
-    def _cpu_paged_attention(
-        self,
-        query_cpu: torch.Tensor,
-        output_cpu: torch.Tensor,
-        cpu_metadata: dict,
-    ) -> None:
-        """调用 vLLM CPU 版本的 Paged Attention Kernel。"""
-        # 调试标记：只要进入此方法就创建标记文件
-        try:
-            with open(_CPU_ATTENTION_EXECUTED_FLAG, "w") as f:
-                f.write("1")
-        except Exception:
-            pass
-        cpu_k_cache, cpu_v_cache = self.cpu_kv_cache.unbind(0)
-        alibi_slopes = cpu_metadata.get('alibi_slopes')
-        scheduler_metadata = cpu_metadata.get('scheduler_metadata', torch.empty(0))
-        if hasattr(torch.ops._C, 'cpu_attention_with_kv_cache'):
-            torch.ops._C.cpu_attention_with_kv_cache(
-                query_cpu,
-                cpu_k_cache,
-                cpu_v_cache,
-                output_cpu,
-                cpu_metadata['query_start_loc'],
-                cpu_metadata['seq_lens'],
-                self.scale,
-                cpu_metadata['causal'],
-                alibi_slopes,
-                self.sliding_window[0] if isinstance(self.sliding_window, tuple) else -1,
-                self.sliding_window[1] if isinstance(self.sliding_window, tuple) else -1,
-                cpu_metadata['block_table'],
-                self.logits_soft_cap if self.logits_soft_cap is not None else 0.0,
-                scheduler_metadata,
-                self.sinks,
-            )
-        else:
-            # Fallback：Python 实现的 Paged Attention（性能较低，用于快速验证）
-            logger.info(
-                "【异构系统】Decode CPU Paged Attention — Python Fallback 执行中, "
-                "layer=%s, query_shape=%s", self.layer_name, query_cpu.shape
-            )
-            torch.ops.vllm.cpu_paged_attention_fallback(
-                query_cpu, cpu_k_cache, cpu_v_cache, output_cpu,
-                cpu_metadata['query_start_loc'],
-                cpu_metadata['seq_lens'],
-                self.scale,
-                cpu_metadata['causal'],
-                alibi_slopes if alibi_slopes is not None else torch.empty(0),
-                self.sliding_window[0] if isinstance(self.sliding_window, tuple) else -1,
-                self.sliding_window[1] if isinstance(self.sliding_window, tuple) else -1,
-                cpu_metadata['block_table'],
-                self.logits_soft_cap if self.logits_soft_cap is not None else 0.0,
-                scheduler_metadata,
-                self.sinks if self.sinks is not None else torch.empty(0),
-            )
 
     def calc_kv_scales(self, query, key, value):
         self._q_scale.copy_(torch.abs(query).max() / self.q_range)
@@ -1095,47 +768,6 @@ def unified_attention_with_output(
     layer_name = _resolve_layer_name(layer_name)
     attn_metadata, self, kv_cache, _ = get_attention_context(layer_name)
 
-    # ==================== 异构系统：Pure Decode CPU 路径 ====================
-    # 该分支在 custom op 内部执行，完全绕过 torch.compile 的图捕获，
-    # 因此可以安全地进行跨设备（GPU->CPU->GPU）操作。
-    # 注意：使用 is_cudagraph_capturing() 而非 torch.cuda.is_current_stream_capturing()
-    # 因为前者在 profile/warmup 期间也为 True，可以避免 dummy run 走 CPU 路径。
-    num_prefill_tokens = getattr(attn_metadata, 'num_prefill_tokens', 0) if attn_metadata is not None else 0
-    if (
-        (num_prefill_tokens == 0)
-        and (query.numel() > 0)
-        and (not is_cudagraph_capturing())
-        and (self.cpu_kv_cache is not None)
-    ):
-        # 1. 等待该层之前 Prefill 的 async D2H 完成
-        if self._d2h_stream is not None:
-            torch.cuda.current_stream().wait_stream(self._d2h_stream)
-
-        # 2. K/V 搬到 CPU，写入 CPU Paged Cache
-        if key is not None and value is not None and attn_metadata is not None:
-            slot_mapping = getattr(attn_metadata, 'slot_mapping', None)
-            if slot_mapping is not None:
-                self._decode_kv_to_cpu(key, value, slot_mapping)
-
-        # 3. Q 搬到 CPU，分配 CPU output
-        query_cpu = query.to('cpu', non_blocking=False)
-        output_cpu = torch.empty(
-            (query.shape[0], self.num_heads, self.head_size_v),
-            dtype=output.dtype,
-            device='cpu',
-            pin_memory=True,
-        )
-
-        # 4. 构造 CPU metadata 并执行 CPU Paged Attention
-        if attn_metadata is not None:
-            cpu_metadata = self._build_cpu_metadata(attn_metadata)
-            self._cpu_paged_attention(query_cpu, output_cpu, cpu_metadata)
-
-        # 5. Output 搬回 GPU
-        output.copy_(output_cpu.to(query.device, non_blocking=False))
-        return
-
-    # ==================== GPU 路径（原有逻辑）====================
     self.impl.forward(
         self,
         query,

@@ -508,14 +508,9 @@ def bind_kv_cache(
         for layer_name in layer_names:
             runner_kv_caches.append(kv_caches[layer_name])
 
-    # 绑定 kv_caches 到 forward context
+    # Bind kv_caches to forward context
     for layer_name, kv_cache in kv_caches.items():
         forward_context[layer_name].kv_cache = kv_cache
-
-    # 异构系统：为每个 Attention 层初始化 CPU KV Cache（主存）
-    for layer_name in kv_caches:
-        if hasattr(forward_context[layer_name], 'init_cpu_kv_cache'):
-            forward_context[layer_name].init_cpu_kv_cache()
 
 
 def is_residual_scattered_for_sp(

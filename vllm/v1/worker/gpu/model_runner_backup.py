@@ -995,18 +995,6 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             need_eager=is_profile or skip_compiled,
         )
 
-        # 异构系统：Pure Decode Batch 强制降级为 Eager 模式
-        # CPU Attention 无法被 CUDA Graph 捕获
-        if batch_desc.cg_mode == CUDAGraphMode.FULL and not is_profile:
-            # 简单判断：如果每个 request 只调度了 1 个 token，则认为是 pure decode
-            scheduled = getattr(scheduler_output, 'num_scheduled_tokens', {})
-            if scheduled and all(n == 1 for n in scheduled.values()):
-                print(
-                    f"【异构系统】检测到 Pure Decode Batch，强制降级为 EAGER 模式，"
-                    f"scheduled_tokens={scheduled}"
-                )
-                batch_desc = batch_desc._replace(cg_mode=CUDAGraphMode.EAGER)
-
         if batch_desc.num_tokens == 0:
             # All DP ranks have zero tokens to run.
             empty_output = self.kv_connector.no_forward(scheduler_output)
