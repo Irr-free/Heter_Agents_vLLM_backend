@@ -25,17 +25,17 @@
       "context_len_target": 128,
       "batch_size": 1,
       "max_tokens": 8,
-      "wall_s": 0.07843041606247425,
-      "request_latency_s_avg": 0.07767413463443518,
-      "request_latency_s_max": 0.07767413463443518,
+      "wall_s": 0.08906019199639559,
+      "request_latency_s_avg": 0.08820981439203024,
+      "request_latency_s_max": 0.08820981439203024,
       "prompt_tokens": 129,
       "completion_tokens": 8,
       "total_tokens": 137,
-      "decode_tok_per_s": 102.00124392592217,
-      "total_tok_per_s": 1746.7713022314172,
+      "decode_tok_per_s": 89.82688921582128,
+      "total_tok_per_s": 1538.2854778209396,
       "responses": [
         {
-          "latency_s": 0.07767413463443518,
+          "latency_s": 0.08820981439203024,
           "usage": {
             "prompt_tokens": 129,
             "total_tokens": 137,
@@ -51,17 +51,17 @@
       "context_len_target": 128,
       "batch_size": 2,
       "max_tokens": 8,
-      "wall_s": 0.10024215467274189,
-      "request_latency_s_avg": 0.09867112152278423,
-      "request_latency_s_max": 0.09881069418042898,
+      "wall_s": 0.10177247039973736,
+      "request_latency_s_avg": 0.09955078503116965,
+      "request_latency_s_max": 0.10000401269644499,
       "prompt_tokens": 258,
       "completion_tokens": 16,
       "total_tokens": 274,
-      "decode_tok_per_s": 159.61348847932098,
-      "total_tok_per_s": 2733.3809902083717,
+      "decode_tok_per_s": 157.2134383409965,
+      "total_tok_per_s": 2692.280131589565,
       "responses": [
         {
-          "latency_s": 0.09853154886513948,
+          "latency_s": 0.10000401269644499,
           "usage": {
             "prompt_tokens": 129,
             "total_tokens": 137,
@@ -71,7 +71,7 @@
           "text": " copied paged KV cache. The benchmark"
         },
         {
-          "latency_s": 0.09881069418042898,
+          "latency_s": 0.09909755736589432,
           "usage": {
             "prompt_tokens": 129,
             "total_tokens": 137,
@@ -87,17 +87,17 @@
       "context_len_target": 512,
       "batch_size": 1,
       "max_tokens": 8,
-      "wall_s": 0.0929072629660368,
-      "request_latency_s_avg": 0.09199252724647522,
-      "request_latency_s_max": 0.09199252724647522,
+      "wall_s": 0.0945906238630414,
+      "request_latency_s_avg": 0.09381871949881315,
+      "request_latency_s_max": 0.09381871949881315,
       "prompt_tokens": 513,
       "completion_tokens": 8,
       "total_tokens": 521,
-      "decode_tok_per_s": 86.1073692691225,
-      "total_tok_per_s": 5607.742423651603,
+      "decode_tok_per_s": 84.57497871652977,
+      "total_tok_per_s": 5507.9454889140015,
       "responses": [
         {
-          "latency_s": 0.09199252724647522,
+          "latency_s": 0.09381871949881315,
           "usage": {
             "prompt_tokens": 513,
             "total_tokens": 521,
@@ -113,17 +113,17 @@
       "context_len_target": 512,
       "batch_size": 2,
       "max_tokens": 8,
-      "wall_s": 0.09841959550976753,
-      "request_latency_s_avg": 0.09590247320011258,
-      "request_latency_s_max": 0.09642500896006823,
+      "wall_s": 0.10871151369065046,
+      "request_latency_s_avg": 0.10654374351724982,
+      "request_latency_s_max": 0.10699967946857214,
       "prompt_tokens": 1026,
       "completion_tokens": 16,
       "total_tokens": 1042,
-      "decode_tok_per_s": 162.5692517544649,
-      "total_tok_per_s": 10587.322520509526,
+      "decode_tok_per_s": 147.1785228336495,
+      "total_tok_per_s": 9585.001299541424,
       "responses": [
         {
-          "latency_s": 0.09642500896006823,
+          "latency_s": 0.10699967946857214,
           "usage": {
             "prompt_tokens": 513,
             "total_tokens": 521,
@@ -133,7 +133,7 @@
           "text": " throughput and latency. GPU prefill writes"
         },
         {
-          "latency_s": 0.09537993744015694,
+          "latency_s": 0.1060878075659275,
           "usage": {
             "prompt_tokens": 513,
             "total_tokens": 521,
@@ -149,17 +149,17 @@
       "context_len_target": 1024,
       "batch_size": 1,
       "max_tokens": 8,
-      "wall_s": 0.09003918338567019,
-      "request_latency_s_avg": 0.08927305694669485,
-      "request_latency_s_max": 0.08927305694669485,
+      "wall_s": 0.10223985742777586,
+      "request_latency_s_avg": 0.10149516724050045,
+      "request_latency_s_max": 0.10149516724050045,
       "prompt_tokens": 1025,
       "completion_tokens": 8,
       "total_tokens": 1033,
-      "decode_tok_per_s": 88.85020609008774,
-      "total_tok_per_s": 11472.782861382579,
+      "decode_tok_per_s": 78.24737046069679,
+      "total_tok_per_s": 10103.691710737472,
       "responses": [
         {
-          "latency_s": 0.08927305694669485,
+          "latency_s": 0.10149516724050045,
           "usage": {
             "prompt_tokens": 1025,
             "total_tokens": 1033,
@@ -175,17 +175,17 @@
       "context_len_target": 1024,
       "batch_size": 2,
       "max_tokens": 8,
-      "wall_s": 0.09778621792793274,
-      "request_latency_s_avg": 0.09548183158040047,
-      "request_latency_s_max": 0.09596062637865543,
+      "wall_s": 0.10661034286022186,
+      "request_latency_s_avg": 0.10444895457476377,
+      "request_latency_s_max": 0.10487037524580956,
       "prompt_tokens": 2050,
       "completion_tokens": 16,
       "total_tokens": 2066,
-      "decode_tok_per_s": 163.62223981084745,
-      "total_tok_per_s": 21127.721715575677,
+      "decode_tok_per_s": 150.0792471981616,
+      "total_tok_per_s": 19378.982794462616,
       "responses": [
         {
-          "latency_s": 0.09596062637865543,
+          "latency_s": 0.10487037524580956,
           "usage": {
             "prompt_tokens": 1025,
             "total_tokens": 1033,
@@ -195,7 +195,7 @@
           "text": " decode attention reads the copied paged KV"
         },
         {
-          "latency_s": 0.0950030367821455,
+          "latency_s": 0.104027533903718,
           "usage": {
             "prompt_tokens": 1025,
             "total_tokens": 1033,
@@ -211,17 +211,17 @@
       "context_len_target": 128,
       "batch_size": 1,
       "max_tokens": 8,
-      "wall_s": 27.461588468402624,
-      "request_latency_s_avg": 27.460616142489016,
-      "request_latency_s_max": 27.460616142489016,
+      "wall_s": 0.364918545819819,
+      "request_latency_s_avg": 0.36403725389391184,
+      "request_latency_s_max": 0.36403725389391184,
       "prompt_tokens": 129,
       "completion_tokens": 8,
       "total_tokens": 137,
-      "decode_tok_per_s": 0.29131599613055237,
-      "total_tok_per_s": 4.988786433735709,
+      "decode_tok_per_s": 21.922700535889057,
+      "total_tok_per_s": 375.42624667710004,
       "responses": [
         {
-          "latency_s": 27.460616142489016,
+          "latency_s": 0.36403725389391184,
           "usage": {
             "prompt_tokens": 129,
             "total_tokens": 137,
@@ -237,17 +237,17 @@
       "context_len_target": 128,
       "batch_size": 2,
       "max_tokens": 8,
-      "wall_s": 49.72236249130219,
-      "request_latency_s_avg": 49.719903436955065,
-      "request_latency_s_max": 49.721359950490296,
+      "wall_s": 0.41850817389786243,
+      "request_latency_s_avg": 0.41676885448396206,
+      "request_latency_s_max": 0.4171434426680207,
       "prompt_tokens": 258,
       "completion_tokens": 16,
       "total_tokens": 274,
-      "decode_tok_per_s": 0.3217868017192232,
-      "total_tok_per_s": 5.510598979441697,
+      "decode_tok_per_s": 38.23103346102106,
+      "total_tok_per_s": 654.7064480199857,
       "responses": [
         {
-          "latency_s": 49.721359950490296,
+          "latency_s": 0.4163942662999034,
           "usage": {
             "prompt_tokens": 129,
             "total_tokens": 137,
@@ -257,7 +257,7 @@
           "text": " copied paged KV cache. The benchmark"
         },
         {
-          "latency_s": 49.71844692341983,
+          "latency_s": 0.4171434426680207,
           "usage": {
             "prompt_tokens": 129,
             "total_tokens": 137,
@@ -273,17 +273,17 @@
       "context_len_target": 512,
       "batch_size": 1,
       "max_tokens": 8,
-      "wall_s": 24.905290374532342,
-      "request_latency_s_avg": 24.904355825856328,
-      "request_latency_s_max": 24.904355825856328,
+      "wall_s": 0.43538623210042715,
+      "request_latency_s_avg": 0.43459402676671743,
+      "request_latency_s_max": 0.43459402676671743,
       "prompt_tokens": 513,
       "completion_tokens": 8,
       "total_tokens": 521,
-      "decode_tok_per_s": 0.32121689326620506,
-      "total_tok_per_s": 20.919250173961604,
+      "decode_tok_per_s": 18.374490073803486,
+      "total_tok_per_s": 1196.6386660564522,
       "responses": [
         {
-          "latency_s": 24.904355825856328,
+          "latency_s": 0.43459402676671743,
           "usage": {
             "prompt_tokens": 513,
             "total_tokens": 521,
@@ -299,17 +299,17 @@
       "context_len_target": 512,
       "batch_size": 2,
       "max_tokens": 8,
-      "wall_s": 46.864625772461295,
-      "request_latency_s_avg": 46.86278511956334,
-      "request_latency_s_max": 46.863606163300574,
+      "wall_s": 0.5134055288508534,
+      "request_latency_s_avg": 0.5108849839307368,
+      "request_latency_s_max": 0.5123906387016177,
       "prompt_tokens": 1026,
       "completion_tokens": 16,
       "total_tokens": 1042,
-      "decode_tok_per_s": 0.3414088928754865,
-      "total_tok_per_s": 22.234254148516055,
+      "decode_tok_per_s": 31.16444818156228,
+      "total_tok_per_s": 2029.5846878242435,
       "responses": [
         {
-          "latency_s": 46.863606163300574,
+          "latency_s": 0.5123906387016177,
           "usage": {
             "prompt_tokens": 513,
             "total_tokens": 521,
@@ -319,7 +319,7 @@
           "text": " throughput and latency. GPU prefill writes"
         },
         {
-          "latency_s": 46.86196407582611,
+          "latency_s": 0.5093793291598558,
           "usage": {
             "prompt_tokens": 513,
             "total_tokens": 521,
@@ -335,17 +335,17 @@
       "context_len_target": 1024,
       "batch_size": 1,
       "max_tokens": 8,
-      "wall_s": 24.436650563031435,
-      "request_latency_s_avg": 24.43577376473695,
-      "request_latency_s_max": 24.43577376473695,
+      "wall_s": 0.5334709705784917,
+      "request_latency_s_avg": 0.532668573781848,
+      "request_latency_s_max": 0.532668573781848,
       "prompt_tokens": 1025,
       "completion_tokens": 8,
       "total_tokens": 1033,
-      "decode_tok_per_s": 0.32737710838745887,
-      "total_tok_per_s": 42.272569120530626,
+      "decode_tok_per_s": 14.99612995122277,
+      "total_tok_per_s": 1936.37527995164,
       "responses": [
         {
-          "latency_s": 24.43577376473695,
+          "latency_s": 0.532668573781848,
           "usage": {
             "prompt_tokens": 1025,
             "total_tokens": 1033,
@@ -361,17 +361,17 @@
       "context_len_target": 1024,
       "batch_size": 2,
       "max_tokens": 8,
-      "wall_s": 48.48759532067925,
-      "request_latency_s_avg": 48.48551445733756,
-      "request_latency_s_max": 48.485961409285665,
+      "wall_s": 0.7088650017976761,
+      "request_latency_s_avg": 0.7067152736708522,
+      "request_latency_s_max": 0.7070221118628979,
       "prompt_tokens": 2050,
       "completion_tokens": 16,
       "total_tokens": 2066,
-      "decode_tok_per_s": 0.32998130540774073,
-      "total_tok_per_s": 42.60883606077452,
+      "decode_tok_per_s": 22.57129348948548,
+      "total_tok_per_s": 2914.518271829813,
       "responses": [
         {
-          "latency_s": 48.485961409285665,
+          "latency_s": 0.7070221118628979,
           "usage": {
             "prompt_tokens": 1025,
             "total_tokens": 1033,
@@ -381,7 +381,7 @@
           "text": " decode attention reads the copied paged KV"
         },
         {
-          "latency_s": 48.48506750538945,
+          "latency_s": 0.7064084354788065,
           "usage": {
             "prompt_tokens": 1025,
             "total_tokens": 1033,

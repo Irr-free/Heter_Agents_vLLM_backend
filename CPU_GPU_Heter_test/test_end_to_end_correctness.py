@@ -5,8 +5,8 @@
 2. 启动默认异构服务，得到 CPU decode attention 输出。
 3. 比较 deterministic greedy 输出文本和 token usage。
 
-该脚本只在子进程环境中设置 no_proxy 与 VLLM_HETER_DISABLE_CPU_ATTENTION，
-不会修改持久系统环境变量。
+该脚本只在子进程环境中设置 no_proxy、VLLM_HETER_DISABLE_CPU_ATTENTION、
+VLLM_HETER_CPU_ATTN_LIB 与 VLLM_HETER_PROFILE，不会修改持久系统环境变量。
 """
 
 import json
@@ -30,6 +30,10 @@ BASE_URL = f"http://localhost:{PORT}/v1"
 TIMEOUT_START = 600
 TIMEOUT_REQ = 300
 LOG_DIR = Path(__file__).parent
+CPP_ATTN_LIB = LOG_DIR.parent / "vllm/libs/libvllm_heter_cpu_attn.so"
+HETER_PROFILE_EVENTS = LOG_DIR / "correctness_heter_profile_events.jsonl"
+MAX_MODEL_LEN = 2048
+KV_CACHE_MEMORY_BYTES = 1 << 30
 
 CHAT_CASES = [
     {
@@ -104,10 +108,12 @@ CONCURRENT_CHAT_CASES = [
 ]
 
 
-def wait_for_server(timeout: int = TIMEOUT_START) -> None:
+def wait_for_server(proc: subprocess.Popen, timeout: int = TIMEOUT_START) -> None:
     deadline = time.time() + timeout
     last_error = None
     while time.time() < deadline:
+        if proc.poll() is not None:
+            raise RuntimeError(f"服务提前退出，exit_code={proc.returncode}")
         try:
             resp = requests.get(f"{BASE_URL}/models", timeout=5)
             if resp.status_code == 200:
@@ -125,8 +131,16 @@ def start_server(name: str, disable_cpu_attention: bool) -> tuple[subprocess.Pop
     env["NO_PROXY"] = "localhost,127.0.0.1"
     if disable_cpu_attention:
         env["VLLM_HETER_DISABLE_CPU_ATTENTION"] = "1"
+        env.pop("VLLM_HETER_CPU_ATTN_LIB", None)
+        env.pop("VLLM_HETER_PROFILE", None)
+        env.pop("VLLM_HETER_PROFILE_PATH", None)
     else:
         env.pop("VLLM_HETER_DISABLE_CPU_ATTENTION", None)
+        if CPP_ATTN_LIB.exists():
+            env["VLLM_HETER_CPU_ATTN_LIB"] = str(CPP_ATTN_LIB)
+        env["VLLM_HETER_PROFILE"] = "1"
+        env["VLLM_HETER_PROFILE_PATH"] = str(HETER_PROFILE_EVENTS)
+        HETER_PROFILE_EVENTS.write_text("", encoding="utf-8")
 
     cmd = [
         VLLM_BIN,
@@ -136,6 +150,10 @@ def start_server(name: str, disable_cpu_attention: bool) -> tuple[subprocess.Pop
         str(PORT),
         "--max-num-seqs",
         "4",
+        "--max-model-len",
+        str(MAX_MODEL_LEN),
+        "--kv-cache-memory-bytes",
+        str(KV_CACHE_MEMORY_BYTES),
         "--gpu-memory-utilization",
         "0.30",
         "--generation-config",
@@ -150,7 +168,7 @@ def start_server(name: str, disable_cpu_attention: bool) -> tuple[subprocess.Pop
         preexec_fn=os.setsid,
     )
     log_fh.close()
-    wait_for_server()
+    wait_for_server(proc)
     return proc, log_path
 
 
@@ -281,6 +299,21 @@ def compare_completion_items(base_item: dict, heter_item: dict) -> dict:
     }
 
 
+def summarize_profile_events(path: Path) -> dict:
+    summary: dict[str, dict[str, float | int]] = {}
+    if not path.exists():
+        return summary
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        event = json.loads(line)
+        name = event["event"]
+        item = summary.setdefault(name, {"count": 0, "total_s": 0.0})
+        item["count"] = int(item["count"]) + 1
+        item["total_s"] = float(item["total_s"]) + float(event["elapsed_s"])
+    return summary
+
+
 def main() -> int:
     baseline, baseline_log = run_suite("gpu_baseline", disable_cpu_attention=True)
     heter, heter_log = run_suite("heter_cpu_decode", disable_cpu_attention=False)
@@ -306,17 +339,18 @@ def main() -> int:
         )
 
     heter_log_text = heter_log.read_text(encoding="utf-8", errors="replace")
-    assert "query_shape=torch.Size([1, 32, 128])" in heter_log_text
-    assert "query_shape=torch.Size([44, 32, 128])" not in heter_log_text
-    summary["decode_cpu_fallback_q1_count"] = heter_log_text.count(
-        "query_shape=torch.Size([1, 32, 128])"
-    )
-    summary["decode_cpu_fallback_q2_count"] = heter_log_text.count(
-        "query_shape=torch.Size([2, 32, 128])"
-    )
-    summary["prefill_cpu_fallback_q44_count"] = heter_log_text.count(
-        "query_shape=torch.Size([44, 32, 128])"
-    )
+    assert "Python Fallback" not in heter_log_text
+    profile_summary = summarize_profile_events(HETER_PROFILE_EVENTS)
+    cpp_count = int(profile_summary.get("cpu_attention_cpp_total", {}).get("count", 0))
+    py_count = int(profile_summary.get("cpu_attention_python_total", {}).get("count", 0))
+    assert cpp_count > 0, profile_summary
+    assert py_count == 0, profile_summary
+    summary["heter_profile_events"] = str(HETER_PROFILE_EVENTS)
+    summary["cpu_attention_cpp_total_count"] = cpp_count
+    summary["cpu_attention_cpp_total_s"] = profile_summary[
+        "cpu_attention_cpp_total"
+    ]["total_s"]
+    summary["cpu_attention_python_total_count"] = py_count
 
     report_path = LOG_DIR / "correctness_report.json"
     report_path.write_text(

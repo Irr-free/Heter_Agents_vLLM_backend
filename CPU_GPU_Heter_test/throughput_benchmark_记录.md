@@ -2,14 +2,14 @@
 
 ## 实验时间
 
-2026-05-13 04:55:13 UTC
+2026-05-13 15:37 UTC
 
 ## 实验目的
 
 对比当前同一份代码中两种运行模式的 decode 吞吐：
 
 - **纯 GPU baseline**：通过临时环境变量 `VLLM_HETER_DISABLE_CPU_ATTENTION=1` 禁用 CPU decode attention 路径。
-- **CPU-GPU 异构路径**：使用默认路径，Prefill/其他算子在 GPU，Decode Self-Attention 在 CPU fallback 中执行。
+- **CPU-GPU 异构路径**：使用默认路径，Prefill/其他算子在 GPU，Decode Self-Attention 在 vLLM 原生 C++ CPU attention 中执行。
 
 ## 实验配置
 
@@ -33,6 +33,7 @@
 - `no_proxy=localhost,127.0.0.1`
 - `NO_PROXY=localhost,127.0.0.1`
 - 纯 GPU baseline 子进程额外设置：`VLLM_HETER_DISABLE_CPU_ATTENTION=1`
+- 异构子进程额外设置：`VLLM_HETER_CPU_ATTN_LIB`
 
 ## 输出文件
 
@@ -46,19 +47,19 @@
 
 | Context | Batch | GPU decode tok/s | Heter decode tok/s | Heter/GPU | GPU avg latency s | Heter avg latency s |
 |---:|---:|---:|---:|---:|---:|---:|
-| 128 | 1 | 102.001 | 0.291 | 0.286% | 0.078 | 27.461 |
-| 128 | 2 | 159.613 | 0.322 | 0.202% | 0.099 | 49.720 |
-| 512 | 1 | 86.107 | 0.321 | 0.373% | 0.092 | 24.904 |
-| 512 | 2 | 162.569 | 0.341 | 0.210% | 0.096 | 46.863 |
-| 1024 | 1 | 88.850 | 0.327 | 0.368% | 0.089 | 24.436 |
-| 1024 | 2 | 163.622 | 0.330 | 0.202% | 0.095 | 48.486 |
+| 128 | 1 | 89.827 | 21.923 | 24.4% | 0.089 | 0.365 |
+| 128 | 2 | 157.213 | 38.231 | 24.3% | 0.102 | 0.419 |
+| 512 | 1 | 84.575 | 18.374 | 21.7% | 0.095 | 0.435 |
+| 512 | 2 | 147.179 | 31.164 | 21.2% | 0.109 | 0.513 |
+| 1024 | 1 | 78.247 | 14.996 | 19.2% | 0.102 | 0.533 |
+| 1024 | 2 | 150.079 | 22.571 | 15.0% | 0.107 | 0.709 |
 
 ## 结论
 
-1. 当前异构路径的 decode 吞吐约为 `0.29-0.34 tok/s`，明显低于纯 GPU baseline 的 `86-164 tok/s`。
-2. batch size 从 1 增加到 2 时，GPU baseline 的吞吐基本接近翻倍；异构路径没有获得同等 batch 扩展收益，说明当前 CPU fallback 路径存在严重串行开销或 Python 调度开销。
-3. context length 从 128 增至 1024 时，异构吞吐变化不大，这说明当前瓶颈主要不是单次 CPU attention 的理论计算量，而更可能是 Python fallback、逐层同步、张量搬运/reshape、CPU/GPU 边界调度等固定开销。
-4. 该结果不能代表最终 C++ CPU kernel 的潜在性能，只能说明当前 correctness-first Python fallback 版本还不具备性能竞争力。
+1. 当前异构路径的 decode 吞吐约为 `15-38 tok/s`，已经明显高于旧 Python fallback，但仍低于纯 GPU baseline 的 `78-157 tok/s`。
+2. batch size 从 1 增加到 2 时，GPU baseline 的吞吐基本接近翻倍；异构路径有扩展，但增益不如 GPU，说明 CPU attention 和 GPU/CPU 搬运仍是主要瓶颈。
+3. context length 从 128 增至 1024 时，异构吞吐继续下降，说明当前瓶颈已经从 Python 拼接 KV 转移到 C++ attention、metadata 构造和跨设备往返开销。
+4. 这组结果代表的是当前原生 C++ CPU attention 接入后的真实性能，不再是 Python fallback 的下界。
 
 ## 备注
 

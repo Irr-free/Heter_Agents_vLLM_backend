@@ -31,10 +31,13 @@ PROFILE_SVG = OUT_DIR / "heter_profile_breakdown.svg"
 PROFILE_CPU_SVG = OUT_DIR / "heter_profile_cpu_attention_breakdown.svg"
 PROFILE_MD = OUT_DIR / "heter_profile_记录.md"
 LOG_PATH = OUT_DIR / "heter_profile_server.log"
+CPP_ATTN_LIB = OUT_DIR.parent / "vllm/libs/libvllm_heter_cpu_attn.so"
 
 CONTEXT_LENGTHS = [128, 512]
 BATCH_SIZE = 1
 MAX_TOKENS = 8
+MAX_MODEL_LEN = 2048
+KV_CACHE_MEMORY_BYTES = 1 << 30
 TIMEOUT_START = 600
 TIMEOUT_REQ = 900
 
@@ -50,6 +53,8 @@ BREAKDOWN_EVENTS = [
     ("decode_query_d2h", "Query D2H"),
     ("decode_output_cpu_alloc", "CPU output alloc"),
     ("decode_metadata_d2h", "Metadata D2H"),
+    ("decode_cpu_scheduler_metadata", "CPU scheduler metadata"),
+    ("cpu_attention_cpp_total", "CPU attention C++"),
     ("cpu_attention_python_total", "CPU attention Python"),
     ("decode_output_h2d", "Output H2D"),
 ]
@@ -63,9 +68,11 @@ CPU_ATTENTION_EVENTS = [
 ]
 
 
-def wait_for_server(timeout: int = TIMEOUT_START) -> None:
+def wait_for_server(proc: subprocess.Popen, timeout: int = TIMEOUT_START) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
+        if proc.poll() is not None:
+            raise RuntimeError(f"vLLM 服务提前退出，exit_code={proc.returncode}")
         try:
             resp = requests.get(f"{BASE_URL}/models", timeout=5)
             if resp.status_code == 200:
@@ -82,6 +89,8 @@ def start_server() -> subprocess.Popen:
     env["NO_PROXY"] = "localhost,127.0.0.1"
     env["VLLM_HETER_PROFILE"] = "1"
     env["VLLM_HETER_PROFILE_PATH"] = str(PROFILE_EVENTS)
+    if CPP_ATTN_LIB.exists():
+        env["VLLM_HETER_CPU_ATTN_LIB"] = str(CPP_ATTN_LIB)
     env.pop("VLLM_HETER_DISABLE_CPU_ATTENTION", None)
     cmd = [
         VLLM_BIN,
@@ -91,6 +100,10 @@ def start_server() -> subprocess.Popen:
         str(PORT),
         "--max-num-seqs",
         str(BATCH_SIZE),
+        "--max-model-len",
+        str(MAX_MODEL_LEN),
+        "--kv-cache-memory-bytes",
+        str(KV_CACHE_MEMORY_BYTES),
         "--gpu-memory-utilization",
         "0.30",
         "--generation-config",
@@ -105,7 +118,7 @@ def start_server() -> subprocess.Popen:
         preexec_fn=os.setsid,
     )
     log_fh.close()
-    wait_for_server()
+    wait_for_server(proc)
     return proc
 
 
@@ -200,7 +213,8 @@ def make_svg(cases: list[dict]) -> None:
     plot_w, row_h = 760, 38
     colors = [
         "#2563eb", "#7c3aed", "#0891b2", "#dc2626", "#ea580c",
-        "#16a34a", "#64748b", "#ca8a04", "#111827", "#be123c",
+        "#16a34a", "#64748b", "#ca8a04", "#059669", "#111827",
+        "#be123c", "#475569",
     ]
     max_total = max(
         sum(case["breakdown_s"].values()) for case in cases
@@ -330,14 +344,15 @@ def write_markdown(report: dict) -> None:
         "",
         "## 端到端与主要阶段",
         "",
-        "| Context | Wall time s | Completion tokens | Instrumented sum s | CPU attention Python s | Output H2D s | Decode KV D2H s | Metadata D2H s |",
-        "|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Context | Wall time s | Completion tokens | Instrumented sum s | CPU attention C++ s | CPU attention Python s | Output H2D s | Decode KV D2H s | Metadata D2H s |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for case in report["cases"]:
         b = case["breakdown_s"]
         lines.append(
             f"| {case['context_len_target']} | {case['wall_s']:.3f} | "
             f"{case['completion_tokens']} | {sum(b.values()):.3f} | "
+            f"{b.get('cpu_attention_cpp_total', 0.0):.3f} | "
             f"{b.get('cpu_attention_python_total', 0.0):.3f} | "
             f"{b.get('decode_output_h2d', 0.0):.3f} | "
             f"{b.get('decode_kv_d2h', 0.0):.3f} | "
@@ -369,9 +384,11 @@ def write_markdown(report: dict) -> None:
         "",
         "本 profile 的 `wall time` 是 API 端到端请求时间。`Instrumented sum` 是 attention 内部事件的累计和，包含逐层、逐 token 事件，因此用于定位热点，而不是严格等同于端到端 wall time。",
         "",
-        "本次结果中 `cpu_attention_python_total` 占主导，并且其内部主要耗时来自 `cpu_attention_collect_kv`，即 Python fallback 每层每 token 都从 paged KV block 中逐块取出、`torch.cat` 拼接 K/V，再做 GQA repeat。真正的 QK、softmax、PV 计算占比很小。",
+        "如果 `cpu_attention_cpp_total` 非 0 且 `cpu_attention_python_total` 为 0，则 Decode Self-Attention 已进入 vLLM 原生 C++ CPU attention。此时 Python fallback 的逐 block KV 收集/拼接事件应消失。",
         "",
-        "因此，当前几十秒开销不是由 prefill GPU 计算主导，也不是由 KV D2H/H2D 主导，而是由 Python fallback 的 paged KV 收集/拼接路径主导。",
+        "如果仍出现 `cpu_attention_python_total`，则说明运行时没有成功加载或调用 C++ 扩展，热点仍来自 Python fallback 每层每 token 从 paged KV block 中逐块取出、`torch.cat` 拼接 K/V，再做 GQA repeat。",
+        "",
+        "本轮 profile 用于区分这两种路径，并记录 C++ kernel 接入后的实际端到端耗时。",
         "",
     ]
     PROFILE_MD.write_text("\n".join(lines), encoding="utf-8")
@@ -403,7 +420,9 @@ def main() -> int:
     proc = None
     cases = []
     try:
+        PROFILE_EVENTS.write_text("", encoding="utf-8")
         proc = start_server()
+        PROFILE_EVENTS.write_text("", encoding="utf-8")
         # Warmup 后清空事件，避免服务启动和首请求噪声进入正式 profile。
         warmup_prompt = build_prompt(tokenizer, CONTEXT_LENGTHS[0])
         send_completion(warmup_prompt)
@@ -437,7 +456,8 @@ def main() -> int:
             print(
                 f"ctx={context_len} wall={case['wall_s']:.3f}s "
                 f"events={case['event_count']} "
-                f"cpu_attn={breakdown_s.get('cpu_attention_python_total', 0.0):.3f}s"
+                f"cpu_attn_cpp={breakdown_s.get('cpu_attention_cpp_total', 0.0):.3f}s "
+                f"cpu_attn_py={breakdown_s.get('cpu_attention_python_total', 0.0):.3f}s"
             )
             cases.append(case)
     finally:

@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
+from functools import lru_cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 import json
 import os
@@ -89,6 +91,93 @@ def _heter_profile_record(
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
     except Exception:
         pass
+
+
+@lru_cache(maxsize=1)
+def _heter_cpu_attn_load_native_lib() -> bool:
+    ops = torch.ops._heter_cpu_attn_C
+    if (
+        hasattr(ops, "get_scheduler_metadata")
+        and hasattr(ops, "reshape_and_cache")
+        and hasattr(ops, "attention_with_kv_cache")
+    ):
+        return True
+
+    candidates: list[Path] = []
+    explicit = os.environ.get("VLLM_HETER_CPU_ATTN_LIB")
+    if explicit:
+        candidates.append(Path(explicit))
+    candidates.append(
+        Path(__file__).resolve().parents[3]
+        / "libs"
+        / "libvllm_heter_cpu_attn.so"
+    )
+
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            torch.ops.load_library(str(candidate))
+        except Exception as exc:
+            logger.warning(
+                "加载异构 CPU attention C++ 扩展失败: path=%s, error=%r",
+                candidate,
+                exc,
+            )
+            continue
+        if (
+            hasattr(ops, "get_scheduler_metadata")
+            and hasattr(ops, "reshape_and_cache")
+            and hasattr(ops, "attention_with_kv_cache")
+        ):
+            return True
+    return False
+
+
+def _heter_cpu_attn_ops() -> Any | None:
+    if (
+        hasattr(torch.ops, "_C")
+        and hasattr(torch.ops._C, "get_scheduler_metadata")
+        and hasattr(torch.ops._C, "cpu_attn_reshape_and_cache")
+        and hasattr(torch.ops._C, "cpu_attention_with_kv_cache")
+    ):
+        return torch.ops._C
+
+    if _heter_cpu_attn_load_native_lib():
+        ops = torch.ops._heter_cpu_attn_C
+        if (
+            hasattr(ops, "get_scheduler_metadata")
+            and hasattr(ops, "reshape_and_cache")
+            and hasattr(ops, "attention_with_kv_cache")
+        ):
+            return ops
+    return None
+
+
+def _heter_cpu_attn_has_cpp_ops() -> bool:
+    return _heter_cpu_attn_ops() is not None
+
+
+def _heter_cpu_attn_isa(
+    dtype: torch.dtype,
+    block_size: int,
+    head_size: int,
+) -> str:
+    if head_size % 32 != 0 and head_size % 16 == 0:
+        return "vec16"
+    if block_size % 32 == 0:
+        return "vec"
+    return "vec16"
+
+
+def _heter_cpu_sliding_window_pair(
+    sliding_window: int | tuple[int, int] | None,
+) -> tuple[int, int]:
+    if sliding_window is None:
+        return (-1, -1)
+    if isinstance(sliding_window, tuple):
+        return sliding_window
+    return (sliding_window - 1, 0)
 
 
 def _heter_query_lens(attn_metadata: AttentionMetadata | None) -> torch.Tensor | None:
@@ -906,11 +995,23 @@ class Attention(nn.Module, AttentionLayerBase):
         profile_start = time.perf_counter() if _heter_profile_enabled() else None
         gpu_k = self.kv_cache[0]  # [num_blocks, block_size, num_kv_heads, head_size]
         gpu_v = self.kv_cache[1]
+        block_size = gpu_k.shape[1]
         cpu_k = self.cpu_kv_cache[0]  # [num_blocks, num_kv_heads, block_size, head_size]
         cpu_v = self.cpu_kv_cache[1]
+        cpu_attn_ops = _heter_cpu_attn_ops()
         with torch.cuda.stream(self._d2h_stream):
-            # GPU layout -> CPU layout: 交换 block_size 和 num_kv_heads 维度
-            cpu_k.copy_(gpu_k.permute(0, 2, 1, 3), non_blocking=True)
+            # vLLM CPU attention stores K as raw [head_size, block_size]
+            # inside each [block, head] cache tile, while V stays row-major.
+            if cpu_attn_ops is not None:
+                native_k_view = cpu_k.as_strided(
+                    size=(gpu_k.shape[0], self.num_kv_heads, self.head_size,
+                          block_size),
+                    stride=(cpu_k.stride(0), cpu_k.stride(1), block_size, 1),
+                )
+                native_k_view.copy_(gpu_k.permute(0, 2, 3, 1),
+                                    non_blocking=True)
+            else:
+                cpu_k.copy_(gpu_k.permute(0, 2, 1, 3), non_blocking=True)
             cpu_v.copy_(gpu_v.permute(0, 2, 1, 3), non_blocking=True)
         if profile_start is not None:
             _heter_profile_record(
@@ -942,13 +1043,21 @@ class Attention(nn.Module, AttentionLayerBase):
             )
             profile_start = time.perf_counter()
         cpu_k_cache, cpu_v_cache = self.cpu_kv_cache.unbind(0)
+        cpu_attn_ops = _heter_cpu_attn_ops()
+        isa = _heter_cpu_attn_isa(key_cpu.dtype, cpu_k_cache.shape[2], self.head_size)
         # 调用 vLLM CPU 版本的 KV Cache 写入 kernel
-        if hasattr(torch.ops._C, 'cpu_attn_reshape_and_cache'):
-            torch.ops._C.cpu_attn_reshape_and_cache(
+        if cpu_attn_ops is not None:
+            reshape_and_cache = getattr(
+                cpu_attn_ops,
+                "cpu_attn_reshape_and_cache",
+                getattr(cpu_attn_ops, "reshape_and_cache", None),
+            )
+            assert reshape_and_cache is not None
+            reshape_and_cache(
                 key_cpu, value_cpu,
                 cpu_k_cache, cpu_v_cache,
                 slot_mapping_cpu,
-                "vec",  # TODO: 根据 CPU 平台动态选择 isa
+                isa,
             )
         else:
             # Fallback：Python 直接写入（性能较低，但无需编译 CPU 扩展）
@@ -967,18 +1076,62 @@ class Attention(nn.Module, AttentionLayerBase):
     def _build_cpu_metadata(self, attn_metadata) -> dict:
         """将 GPU attn_metadata 中的关键 tensor 搬到 CPU，供 CPU Attention kernel 使用。"""
         profile_start = time.perf_counter() if _heter_profile_enabled() else None
+        query_start_loc = attn_metadata.query_start_loc.cpu().to(torch.int32)
+        seq_lens = attn_metadata.seq_lens.cpu().to(torch.int32)
+        block_table = attn_metadata.block_table.cpu().to(torch.int32)
         cpu_meta = {
-            'query_start_loc': attn_metadata.query_start_loc.cpu(),
-            'seq_lens': attn_metadata.seq_lens.cpu(),
-            'block_table': attn_metadata.block_table.cpu(),
+            'query_start_loc': query_start_loc,
+            'seq_lens': seq_lens,
+            'block_table': block_table,
             'causal': attn_metadata.causal,
         }
         if hasattr(attn_metadata, 'alibi_slopes') and attn_metadata.alibi_slopes is not None:
             cpu_meta['alibi_slopes'] = attn_metadata.alibi_slopes.cpu()
         else:
             cpu_meta['alibi_slopes'] = None
-        if hasattr(attn_metadata, 'scheduler_metadata') and attn_metadata.scheduler_metadata is not None:
-            cpu_meta['scheduler_metadata'] = attn_metadata.scheduler_metadata.cpu()
+        cpu_attn_ops = _heter_cpu_attn_ops()
+        if cpu_attn_ops is not None:
+            get_scheduler_metadata = getattr(
+                cpu_attn_ops,
+                "get_scheduler_metadata",
+                getattr(cpu_attn_ops, "get_scheduler_metadata", None),
+            )
+            assert get_scheduler_metadata is not None
+            profile_scheduler_start = (
+                time.perf_counter() if _heter_profile_enabled() else None
+            )
+            sliding_window_left, _ = _heter_cpu_sliding_window_pair(
+                self.sliding_window
+            )
+            sliding_window_size = (
+                sliding_window_left + 1 if sliding_window_left >= 0 else -1
+            )
+            isa = _heter_cpu_attn_isa(
+                self.dtype,
+                int(self.cpu_kv_cache.shape[3]) if self.cpu_kv_cache is not None else 32,
+                self.head_size,
+            )
+            cpu_meta['scheduler_metadata'] = (
+                get_scheduler_metadata(
+                    int(query_start_loc.numel() - 1),
+                    int(self.num_heads),
+                    int(self.num_kv_heads),
+                    int(self.head_size),
+                    seq_lens,
+                    torch.empty((), dtype=self.dtype).dtype,
+                    query_start_loc,
+                    bool(attn_metadata.causal),
+                    int(sliding_window_size),
+                    isa,
+                    False,
+                )
+            )
+            if profile_scheduler_start is not None:
+                _heter_profile_record(
+                    "decode_cpu_scheduler_metadata",
+                    time.perf_counter() - profile_scheduler_start,
+                    self.layer_name,
+                )
         else:
             cpu_meta['scheduler_metadata'] = torch.empty(0)
         if profile_start is not None:
@@ -1007,8 +1160,18 @@ class Attention(nn.Module, AttentionLayerBase):
         cpu_k_cache, cpu_v_cache = self.cpu_kv_cache.unbind(0)
         alibi_slopes = cpu_metadata.get('alibi_slopes')
         scheduler_metadata = cpu_metadata.get('scheduler_metadata', torch.empty(0))
-        if hasattr(torch.ops._C, 'cpu_attention_with_kv_cache'):
-            torch.ops._C.cpu_attention_with_kv_cache(
+        cpu_attn_ops = _heter_cpu_attn_ops()
+        if cpu_attn_ops is not None:
+            sliding_window_left, sliding_window_right = (
+                _heter_cpu_sliding_window_pair(self.sliding_window)
+            )
+            attention_with_kv_cache = getattr(
+                cpu_attn_ops,
+                "cpu_attention_with_kv_cache",
+                getattr(cpu_attn_ops, "attention_with_kv_cache", None),
+            )
+            assert attention_with_kv_cache is not None
+            attention_with_kv_cache(
                 query_cpu,
                 cpu_k_cache,
                 cpu_v_cache,
@@ -1018,8 +1181,8 @@ class Attention(nn.Module, AttentionLayerBase):
                 self.scale,
                 cpu_metadata['causal'],
                 alibi_slopes,
-                self.sliding_window[0] if isinstance(self.sliding_window, tuple) else -1,
-                self.sliding_window[1] if isinstance(self.sliding_window, tuple) else -1,
+                sliding_window_left,
+                sliding_window_right,
                 cpu_metadata['block_table'],
                 self.logits_soft_cap if self.logits_soft_cap is not None else 0.0,
                 scheduler_metadata,

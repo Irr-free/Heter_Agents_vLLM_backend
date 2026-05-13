@@ -20,20 +20,20 @@
 <text x="-8" y="45.165195554113325" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">100</text>
 <line x1="0" y1="0.0" x2="441.0" y2="0.0" stroke="#e5e7eb" stroke-width="1"/>
 <text x="-8" y="4.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">300</text>
-<rect x="32.3" y="40.4" width="41.2" height="259.6" fill="#2b6cb0"/>
-<text x="52.92" y="36.42273066951111" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">102.0</text>
-<rect x="73.5" y="259.9" width="41.2" height="40.1" fill="#c2410c"/>
-<text x="94.08" y="255.93544961514937" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.3</text>
+<rect x="32.3" y="45.2" width="41.2" height="254.8" fill="#2b6cb0"/>
+<text x="52.92" y="41.185214125095115" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">89.8</text>
+<rect x="73.5" y="98.0" width="41.2" height="202.0" fill="#c2410c"/>
+<text x="94.08" y="94.03171532265901" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">21.9</text>
 <text x="73.5" y="322" font-size="11" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">128</text>
-<rect x="179.3" y="46.8" width="41.2" height="253.2" fill="#2b6cb0"/>
-<text x="199.92" y="42.769804159707206" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">86.1</text>
-<rect x="220.5" y="256.3" width="41.2" height="43.7" fill="#c2410c"/>
-<text x="241.08" y="252.27431369832163" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.3</text>
+<rect x="179.3" y="47.4" width="41.2" height="252.6" fill="#2b6cb0"/>
+<text x="199.92" y="43.44263866015896" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">84.6</text>
+<rect x="220.5" y="104.6" width="41.2" height="195.4" fill="#c2410c"/>
+<text x="241.08" y="100.6474255933098" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">18.4</text>
 <text x="220.5" y="322" font-size="11" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">512</text>
-<rect x="326.3" y="45.6" width="41.2" height="254.4" fill="#2b6cb0"/>
-<text x="346.92" y="41.59485647823212" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">88.9</text>
-<rect x="367.5" y="255.6" width="41.2" height="44.4" fill="#c2410c"/>
-<text x="388.08" y="251.56252393807364" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.3</text>
+<rect x="326.3" y="50.4" width="41.2" height="249.6" fill="#2b6cb0"/>
+<text x="346.92" y="46.35644087464016" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">78.2</text>
+<rect x="367.5" y="112.3" width="41.2" height="187.7" fill="#c2410c"/>
+<text x="388.08" y="108.26028350982833" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">15.0</text>
 <text x="367.5" y="322" font-size="11" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">1024</text>
 <text x="220.5" y="-18" font-size="14" font-family="Arial, sans-serif" text-anchor="middle" font-weight="bold">Batch size = 1</text>
 <text x="220.5" y="348" font-size="12" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">Context length (tokens)</text>
@@ -43,25 +43,25 @@
 <line x1="0" y1="210.0" x2="441.0" y2="210.0" stroke="#e5e7eb" stroke-width="1"/>
 <text x="-8" y="214.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">0.0</text>
 <line x1="0" y1="168.0" x2="441.0" y2="168.0" stroke="#e5e7eb" stroke-width="1"/>
-<text x="-8" y="172.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">0.6</text>
+<text x="-8" y="172.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">5.6</text>
 <line x1="0" y1="126.0" x2="441.0" y2="126.0" stroke="#e5e7eb" stroke-width="1"/>
-<text x="-8" y="130.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">1.2</text>
+<text x="-8" y="130.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">11.2</text>
 <line x1="0" y1="84.0" x2="441.0" y2="84.0" stroke="#e5e7eb" stroke-width="1"/>
-<text x="-8" y="88.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">1.8</text>
+<text x="-8" y="87.99999999999999" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">16.9</text>
 <line x1="0" y1="42.0" x2="441.0" y2="42.0" stroke="#e5e7eb" stroke-width="1"/>
-<text x="-8" y="46.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">2.4</text>
+<text x="-8" y="46.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">22.5</text>
 <line x1="0" y1="0.0" x2="441.0" y2="0.0" stroke="#e5e7eb" stroke-width="1"/>
-<text x="-8" y="4.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">3.0</text>
+<text x="-8" y="4.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">28.1</text>
 <text x="73.5" y="232" font-size="11" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">128</text>
 <text x="220.5" y="232" font-size="11" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">512</text>
 <text x="367.5" y="232" font-size="11" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">1024</text>
-<polyline points="73.5,190.0 220.5,183.9 367.5,184.2" fill="none" stroke="#111827" stroke-width="1.8"/>
-<circle cx="73.5" cy="190.0" r="4" fill="#111827"/>
-<text x="73.5" y="182.0079695655983" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.29%</text>
-<circle cx="220.5" cy="183.9" r="4" fill="#111827"/>
-<text x="220.5" y="175.8870404246604" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.37%</text>
-<circle cx="367.5" cy="184.2" r="4" fill="#111827"/>
-<text x="367.5" y="176.20782843892727" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.37%</text>
+<polyline points="73.5,27.6 220.5,47.6 367.5,66.8" fill="none" stroke="#111827" stroke-width="1.8"/>
+<circle cx="73.5" cy="27.6" r="4" fill="#111827"/>
+<text x="73.5" y="19.61014993362525" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">24.41%</text>
+<circle cx="220.5" cy="47.6" r="4" fill="#111827"/>
+<text x="220.5" y="39.637259501009794" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">21.73%</text>
+<circle cx="367.5" cy="66.8" r="4" fill="#111827"/>
+<text x="367.5" y="58.77381694034821" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">19.17%</text>
 <text x="220.5" y="-18" font-size="13" font-family="Arial, sans-serif" text-anchor="middle" font-weight="bold">Heterogeneous throughput / GPU throughput, batch=1</text>
 <text x="220.5" y="258" font-size="12" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">Context length (tokens)</text>
 </g>
@@ -83,20 +83,20 @@
 <text x="-8" y="45.165195554113325" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">100</text>
 <line x1="0" y1="0.0" x2="441.0" y2="0.0" stroke="#e5e7eb" stroke-width="1"/>
 <text x="-8" y="4.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">300</text>
-<rect x="32.3" y="23.6" width="41.2" height="276.4" fill="#2b6cb0"/>
-<text x="52.92" y="19.644703054097818" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">159.6</text>
-<rect x="73.5" y="256.2" width="41.2" height="43.8" fill="#c2410c"/>
-<text x="94.08" y="252.2078923832873" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.3</text>
+<rect x="32.3" y="24.2" width="41.2" height="275.8" fill="#2b6cb0"/>
+<text x="52.92" y="20.212407457880886" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">157.2</text>
+<rect x="73.5" y="77.2" width="41.2" height="222.8" fill="#c2410c"/>
+<text x="94.08" y="73.1936166001307" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">38.2</text>
 <text x="73.5" y="322" font-size="11" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">128</text>
-<rect x="179.3" y="23.0" width="41.2" height="277.0" fill="#2b6cb0"/>
-<text x="199.92" y="18.95716729899226" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">162.6</text>
-<rect x="220.5" y="254.0" width="41.2" height="46.0" fill="#c2410c"/>
-<text x="241.08" y="249.98997128536877" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.3</text>
+<rect x="179.3" y="26.7" width="41.2" height="273.3" fill="#2b6cb0"/>
+<text x="199.92" y="22.68386797078773" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">147.2</text>
+<rect x="220.5" y="84.9" width="41.2" height="215.1" fill="#c2410c"/>
+<text x="241.08" y="80.85138204445545" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">31.2</text>
 <text x="220.5" y="322" font-size="11" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">512</text>
-<rect x="326.3" y="22.7" width="41.2" height="277.3" fill="#2b6cb0"/>
-<text x="346.92" y="18.715249372708797" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">163.6</text>
-<rect x="367.5" y="255.3" width="41.2" height="44.7" fill="#c2410c"/>
-<text x="388.08" y="251.26563801247428" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.3</text>
+<rect x="326.3" y="26.0" width="41.2" height="274.0" fill="#2b6cb0"/>
+<text x="346.92" y="21.952555871146217" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">150.1</text>
+<rect x="367.5" y="96.9" width="41.2" height="203.1" fill="#c2410c"/>
+<text x="388.08" y="92.93922569076284" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">22.6</text>
 <text x="367.5" y="322" font-size="11" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">1024</text>
 <text x="220.5" y="-18" font-size="14" font-family="Arial, sans-serif" text-anchor="middle" font-weight="bold">Batch size = 2</text>
 <text x="220.5" y="348" font-size="12" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">Context length (tokens)</text>
@@ -106,25 +106,25 @@
 <line x1="0" y1="210.0" x2="441.0" y2="210.0" stroke="#e5e7eb" stroke-width="1"/>
 <text x="-8" y="214.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">0.0</text>
 <line x1="0" y1="168.0" x2="441.0" y2="168.0" stroke="#e5e7eb" stroke-width="1"/>
-<text x="-8" y="172.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">0.6</text>
+<text x="-8" y="172.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">5.6</text>
 <line x1="0" y1="126.0" x2="441.0" y2="126.0" stroke="#e5e7eb" stroke-width="1"/>
-<text x="-8" y="130.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">1.2</text>
+<text x="-8" y="130.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">11.2</text>
 <line x1="0" y1="84.0" x2="441.0" y2="84.0" stroke="#e5e7eb" stroke-width="1"/>
-<text x="-8" y="88.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">1.8</text>
+<text x="-8" y="87.99999999999999" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">16.9</text>
 <line x1="0" y1="42.0" x2="441.0" y2="42.0" stroke="#e5e7eb" stroke-width="1"/>
-<text x="-8" y="46.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">2.4</text>
+<text x="-8" y="46.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">22.5</text>
 <line x1="0" y1="0.0" x2="441.0" y2="0.0" stroke="#e5e7eb" stroke-width="1"/>
-<text x="-8" y="4.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">3.0</text>
+<text x="-8" y="4.0" font-size="10" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">28.1</text>
 <text x="73.5" y="232" font-size="11" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">128</text>
 <text x="220.5" y="232" font-size="11" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">512</text>
 <text x="367.5" y="232" font-size="11" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">1024</text>
-<polyline points="73.5,195.9 220.5,195.3 367.5,195.9" fill="none" stroke="#111827" stroke-width="1.8"/>
-<circle cx="73.5" cy="195.9" r="4" fill="#111827"/>
-<text x="73.5" y="187.88773647205642" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.20%</text>
-<circle cx="220.5" cy="195.3" r="4" fill="#111827"/>
-<text x="220.5" y="187.29942025114372" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.21%</text>
-<circle cx="367.5" cy="195.9" r="4" fill="#111827"/>
-<text x="367.5" y="187.88291456879904" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.20%</text>
+<polyline points="73.5,28.3 220.5,51.8 367.5,97.6" fill="none" stroke="#111827" stroke-width="1.8"/>
+<circle cx="73.5" cy="28.3" r="4" fill="#111827"/>
+<text x="73.5" y="20.264677165200595" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">24.32%</text>
+<circle cx="220.5" cy="51.8" r="4" fill="#111827"/>
+<text x="220.5" y="43.75573612504235" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">21.17%</text>
+<circle cx="367.5" cy="97.6" r="4" fill="#111827"/>
+<text x="367.5" y="89.60453716199387" font-size="9" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">15.04%</text>
 <text x="220.5" y="-18" font-size="13" font-family="Arial, sans-serif" text-anchor="middle" font-weight="bold">Heterogeneous throughput / GPU throughput, batch=2</text>
 <text x="220.5" y="258" font-size="12" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">Context length (tokens)</text>
 </g>

@@ -309,6 +309,63 @@ set(VLLM_EXT_SRC
   "csrc/custom_all_reduce.cu"
   "csrc/torch_bindings.cpp")
 
+#
+# CPU-GPU heterogeneous decode attention support.
+# CUDA builds do not include cmake/cpu_extension.cmake, so the native CPU
+# attention ops are otherwise unavailable in torch.ops._C.  Build only the CPU
+# attention implementation here and register it in the main _C extension.
+#
+if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  vllm_prepare_torch_gomp_shim(VLLM_HETER_TORCH_GOMP_SHIM_DIR)
+  find_library(VLLM_HETER_OPEN_MP
+    NAMES gomp
+    PATHS ${VLLM_HETER_TORCH_GOMP_SHIM_DIR}
+    NO_DEFAULT_PATH
+    REQUIRED)
+  list(APPEND VLLM_HETER_CPU_ATTN_LIBS ${VLLM_HETER_OPEN_MP})
+endif()
+
+set(VLLM_HETER_CPU_ATTN_FLAGS "-DVLLM_CPU_EXTENSION" "-DVLLM_NUMA_DISABLED")
+if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  list(APPEND VLLM_HETER_CPU_ATTN_FLAGS "-fopenmp")
+endif()
+
+set(VLLM_HETER_CPU_ATTN_COMPILE_FLAGS ${VLLM_HETER_CPU_ATTN_FLAGS})
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
+  list(APPEND VLLM_HETER_CPU_ATTN_FLAGS "-mf16c" "-mavx2")
+  set(VLLM_HETER_CPU_ATTN_COMPILE_FLAGS ${VLLM_HETER_CPU_ATTN_FLAGS})
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
+     CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12.3)
+    set(VLLM_HETER_CPU_ATTN_COMPILE_FLAGS
+      ${VLLM_HETER_CPU_ATTN_FLAGS}
+      "-mavx512f"
+      "-mavx512vl"
+      "-mavx512bw"
+      "-mavx512dq"
+      "-mamx-bf16"
+      "-mamx-tile"
+      "-mavx512bf16"
+      "-mavx512vnni")
+  endif()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+  list(APPEND VLLM_HETER_CPU_ATTN_FLAGS "")
+else()
+  list(APPEND VLLM_HETER_CPU_ATTN_FLAGS "")
+endif()
+
+message(STATUS "Generating CPU attention dispatch header for heterogeneous CUDA build")
+execute_process(
+  COMMAND ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/csrc/cpu/generate_cpu_attn_dispatch.py
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/csrc/cpu
+  RESULT_VARIABLE HETER_CPU_ATTN_GEN_RESULT)
+if(NOT HETER_CPU_ATTN_GEN_RESULT EQUAL 0)
+  message(FATAL_ERROR "Failed to generate CPU attention dispatch header")
+endif()
+
+list(APPEND VLLM_EXT_SRC
+  "csrc/cpu/utils.cpp"
+  "csrc/cpu/cpu_attn.cpp")
+
 if(VLLM_GPU_LANG STREQUAL "CUDA")
   list(APPEND VLLM_EXT_SRC
     "csrc/minimax_reduce_rms_kernel.cu"
@@ -667,6 +724,7 @@ define_extension_target(
   ARCHITECTURES ${VLLM_GPU_ARCHES}
   INCLUDE_DIRECTORIES ${CUTLASS_INCLUDE_DIR}
   INCLUDE_DIRECTORIES ${CUTLASS_TOOLS_UTIL_INCLUDE_DIR}
+  LIBRARIES ${VLLM_HETER_CPU_ATTN_LIBS}
   USE_SABI 3
   WITH_SOABI)
 
@@ -675,6 +733,17 @@ define_extension_target(
 # driver API. This causes problems when linking with earlier versions of CUDA.
 # Setting this variable sidesteps the issue by calling the driver directly.
 target_compile_definitions(_C PRIVATE CUTLASS_ENABLE_DIRECT_CUDA_DRIVER_CALL=1)
+if(VLLM_HETER_CPU_ATTN_FLAGS)
+  set_source_files_properties(
+    csrc/cpu/utils.cpp
+    PROPERTIES COMPILE_OPTIONS "${VLLM_HETER_CPU_ATTN_FLAGS}")
+  set_source_files_properties(
+    csrc/cpu/cpu_attn.cpp
+    PROPERTIES COMPILE_OPTIONS "${VLLM_HETER_CPU_ATTN_COMPILE_FLAGS}")
+  if(VLLM_HETER_CPU_ATTN_COMPILE_FLAGS MATCHES "mamx")
+    target_compile_definitions(_C PRIVATE CPU_CAPABILITY_AMXBF16)
+  endif()
+endif()
 
 # add OR VLLM_GPU_LANG STREQUAL "HIP" here once
 # https://github.com/vllm-project/vllm/issues/35163 is resolved

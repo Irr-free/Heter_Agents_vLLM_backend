@@ -31,12 +31,15 @@ BASE_URL = f"http://localhost:{PORT}/v1"
 LOG_DIR = Path(__file__).parent
 RESULT_JSON = LOG_DIR / "throughput_benchmark_results.json"
 FIG_SVG = LOG_DIR / "throughput_benchmark_figure.svg"
+CPP_ATTN_LIB = LOG_DIR.parent / "vllm/libs/libvllm_heter_cpu_attn.so"
 
 CONTEXT_LENGTHS = [128, 512, 1024]
 BATCH_SIZES = [1, 2]
 WARMUP_CONTEXT_LEN = 128
 WARMUP_BATCH_SIZE = 1
 MAX_TOKENS = 8
+MAX_MODEL_LEN = 2048
+KV_CACHE_MEMORY_BYTES = 1 << 30
 TIMEOUT_START = 600
 TIMEOUT_REQ = 900
 
@@ -66,6 +69,8 @@ def start_server(mode: str) -> tuple[subprocess.Popen, Path]:
         env["VLLM_HETER_DISABLE_CPU_ATTENTION"] = "1"
     else:
         env.pop("VLLM_HETER_DISABLE_CPU_ATTENTION", None)
+        if CPP_ATTN_LIB.exists():
+            env["VLLM_HETER_CPU_ATTN_LIB"] = str(CPP_ATTN_LIB)
 
     cmd = [
         VLLM_BIN,
@@ -75,6 +80,10 @@ def start_server(mode: str) -> tuple[subprocess.Popen, Path]:
         str(PORT),
         "--max-num-seqs",
         str(max(BATCH_SIZES)),
+        "--max-model-len",
+        str(MAX_MODEL_LEN),
+        "--kv-cache-memory-bytes",
+        str(KV_CACHE_MEMORY_BYTES),
         "--gpu-memory-utilization",
         "0.30",
         "--generation-config",
