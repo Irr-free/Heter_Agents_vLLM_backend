@@ -1,0 +1,639 @@
+{
+  "baseline_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/correctness_gpu_baseline.log",
+  "heter_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/correctness_heter_cpu_decode.log",
+  "baseline": {
+    "chat": [
+      {
+        "name": "short_math",
+        "kind": "chat",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hello, what is 2+2?"
+          }
+        ],
+        "content": "The answer to 2+2 is 4.",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 44,
+          "total_tokens": 56,
+          "completion_tokens": 12,
+          "prompt_tokens_details": null
+        }
+      },
+      {
+        "name": "short_paris",
+        "kind": "chat",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Write one short sentence about Paris."
+          }
+        ],
+        "content": "Paris, the capital of France, is famous for its stunning",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 42,
+          "total_tokens": 54,
+          "completion_tokens": 12,
+          "prompt_tokens_details": null
+        }
+      },
+      {
+        "name": "long_prompt_summary",
+        "kind": "chat",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. "
+          }
+        ],
+        "content": "The system copies KV cache to CPU memory after prefill and each new decode KV",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 555,
+          "total_tokens": 571,
+          "completion_tokens": 16,
+          "prompt_tokens_details": null
+        }
+      },
+      {
+        "name": "multi_turn_chat",
+        "kind": "chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Answer briefly and deterministically."
+          },
+          {
+            "role": "user",
+            "content": "Name one primary color."
+          },
+          {
+            "role": "assistant",
+            "content": "Red."
+          },
+          {
+            "role": "user",
+            "content": "Now name one different primary color."
+          }
+        ],
+        "content": "Blue.",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 65,
+          "total_tokens": 68,
+          "completion_tokens": 3,
+          "prompt_tokens_details": null
+        }
+      }
+    ],
+    "completion": [
+      {
+        "name": "completion_logprobs_short",
+        "kind": "completion",
+        "prompt": "The capital of France is",
+        "text": " a city of romance, art",
+        "finish_reason": "length",
+        "token_ids": [
+          264,
+          3363,
+          315,
+          30363,
+          11,
+          1989
+        ],
+        "tokens": [
+          " a",
+          " city",
+          " of",
+          " romance",
+          ",",
+          " art"
+        ],
+        "token_logprobs": [
+          -1.5905178785324097,
+          -0.758216381072998,
+          -1.0563920736312866,
+          -1.8961678743362427,
+          -0.3989630937576294,
+          -1.068219542503357
+        ],
+        "top_logprobs": [
+          {
+            " a": -1.5905178785324097,
+            " Paris": -1.6530178785324097,
+            " known": -2.590517997741699,
+            " home": -2.715517997741699,
+            " the": -3.278017997741699
+          },
+          {
+            " city": -0.758216381072998,
+            " must": -2.258216381072998,
+            " beautiful": -2.758216381072998,
+            " place": -3.383216381072998,
+            " popular": -3.445716381072998
+          },
+          {
+            " of": -1.0563920736312866,
+            " that": -1.3063920736312866,
+            " like": -2.056392192840576,
+            " steep": -2.931392192840576,
+            " known": -3.431392192840576
+          },
+          {
+            " romance": -1.8961678743362427,
+            " grand": -2.083667755126953,
+            " beauty": -2.521167755126953,
+            " love": -2.833667755126953,
+            " great": -3.146167755126953
+          },
+          {
+            ",": -0.3989630937576294,
+            " and": -1.1489630937576294,
+            ".": -5.39896297454834,
+            " that": -6.77396297454834,
+            " ,": -6.83646297454834
+          },
+          {
+            " art": -1.068219542503357,
+            " fashion": -1.568219542503357,
+            " beauty": -1.943219542503357,
+            " history": -2.1932196617126465,
+            " culture": -3.6932196617126465
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 6,
+          "total_tokens": 12,
+          "completion_tokens": 6,
+          "prompt_tokens_details": null
+        }
+      },
+      {
+        "name": "completion_logprobs_long",
+        "kind": "completion",
+        "prompt": "In a heterogeneous inference system, GPU prefill creates the KV cache, then CPU decode attention reads that cache. The next generated word is",
+        "text": " then written to the KV cache. This",
+        "finish_reason": "length",
+        "token_ids": [
+          1243,
+          5439,
+          311,
+          279,
+          85748,
+          6636,
+          13,
+          1115
+        ],
+        "tokens": [
+          " then",
+          " written",
+          " to",
+          " the",
+          " KV",
+          " cache",
+          ".",
+          " This"
+        ],
+        "token_logprobs": [
+          -1.8354268074035645,
+          -2.066969633102417,
+          -0.5581463575363159,
+          -0.3378734886646271,
+          -1.0780513286590576,
+          -0.021161722019314766,
+          -1.2535772323608398,
+          -1.8622089624404907
+        ],
+        "top_logprobs": [
+          {
+            " then": -1.8354268074035645,
+            " written": -2.5854268074035645,
+            " stored": -3.0229268074035645,
+            " computed": -3.1479268074035645,
+            " determined": -3.1479268074035645
+          },
+          {
+            " written": -2.066969633102417,
+            " passed": -2.379469633102417,
+            " sent": -2.504469633102417,
+            " computed": -2.691969633102417,
+            " used": -2.941969633102417
+          },
+          {
+            " to": -0.5581463575363159,
+            " back": -1.433146357536316,
+            " into": -2.3081464767456055,
+            " out": -3.8081464767456055,
+            " directly": -4.0581464767456055
+          },
+          {
+            " the": -0.3378734886646271,
+            " a": -2.7128734588623047,
+            " that": -2.9628734588623047,
+            " GPU": -3.5253734588623047,
+            " memory": -4.212873458862305
+          },
+          {
+            " KV": -1.0780513286590576,
+            " cache": -1.5155513286590576,
+            " GPU": -2.0780513286590576,
+            " output": -2.9530513286590576,
+            " CPU": -3.9530513286590576
+          },
+          {
+            " cache": -0.021161722019314766,
+            " store": -4.9586615562438965,
+            " memory": -6.3336615562438965,
+            " Cache": -6.9586615562438965,
+            " table": -7.2711615562438965
+          },
+          {
+            ".": -1.2535772323608398,
+            ",": -1.5035772323608398,
+            " and": -2.62857723236084,
+            ".\n": -2.75357723236084,
+            " by": -2.75357723236084
+          },
+          {
+            " This": -1.8622089624404907,
+            " The": -2.237208843231201,
+            " In": -2.674708843231201,
+            " However": -2.862208843231201,
+            " If": -3.737208843231201
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 28,
+          "total_tokens": 36,
+          "completion_tokens": 8,
+          "prompt_tokens_details": null
+        }
+      }
+    ],
+    "concurrent_chat": [
+      {
+        "name": "concurrent_math",
+        "kind": "chat",
+        "messages": [
+          {
+            "role": "user",
+            "content": "What is 3+5? Answer briefly."
+          }
+        ],
+        "content": "3 + 5 = 8.",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 45,
+          "total_tokens": 53,
+          "completion_tokens": 8,
+          "prompt_tokens_details": null
+        }
+      },
+      {
+        "name": "concurrent_city",
+        "kind": "chat",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Name the capital of Italy."
+          }
+        ],
+        "content": "The capital of Italy is Rome.",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 41,
+          "total_tokens": 49,
+          "completion_tokens": 8,
+          "prompt_tokens_details": null
+        }
+      }
+    ]
+  },
+  "heter": {
+    "chat": [
+      {
+        "name": "short_math",
+        "kind": "chat",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hello, what is 2+2?"
+          }
+        ],
+        "content": "The answer to 2+2 is 4.",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 44,
+          "total_tokens": 56,
+          "completion_tokens": 12,
+          "prompt_tokens_details": null
+        }
+      },
+      {
+        "name": "short_paris",
+        "kind": "chat",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Write one short sentence about Paris."
+          }
+        ],
+        "content": "Paris, the capital of France, is famous for its stunning",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 42,
+          "total_tokens": 54,
+          "completion_tokens": 12,
+          "prompt_tokens_details": null
+        }
+      },
+      {
+        "name": "long_prompt_summary",
+        "kind": "chat",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. Read the following notes and answer with one concise sentence. The system has a GPU prefill stage and a CPU decode attention stage. KV cache is copied to CPU memory after prefill, and each new decode KV entry is also copied immediately. The goal is to preserve paged attention behavior while testing CPU-GPU heterogeneous execution. "
+          }
+        ],
+        "content": "The system copies KV cache to CPU memory after prefill and each new decode KV",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 555,
+          "total_tokens": 571,
+          "completion_tokens": 16,
+          "prompt_tokens_details": null
+        }
+      },
+      {
+        "name": "multi_turn_chat",
+        "kind": "chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Answer briefly and deterministically."
+          },
+          {
+            "role": "user",
+            "content": "Name one primary color."
+          },
+          {
+            "role": "assistant",
+            "content": "Red."
+          },
+          {
+            "role": "user",
+            "content": "Now name one different primary color."
+          }
+        ],
+        "content": "Blue.",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 65,
+          "total_tokens": 68,
+          "completion_tokens": 3,
+          "prompt_tokens_details": null
+        }
+      }
+    ],
+    "completion": [
+      {
+        "name": "completion_logprobs_short",
+        "kind": "completion",
+        "prompt": "The capital of France is",
+        "text": " a city of romance, art",
+        "finish_reason": "length",
+        "token_ids": [
+          264,
+          3363,
+          315,
+          30363,
+          11,
+          1989
+        ],
+        "tokens": [
+          " a",
+          " city",
+          " of",
+          " romance",
+          ",",
+          " art"
+        ],
+        "token_logprobs": [
+          -1.5905178785324097,
+          -0.7566961050033569,
+          -1.0501012802124023,
+          -1.8981225490570068,
+          -0.39764267206192017,
+          -1.0704760551452637
+        ],
+        "top_logprobs": [
+          {
+            " a": -1.5905178785324097,
+            " Paris": -1.6530178785324097,
+            " known": -2.590517997741699,
+            " home": -2.715517997741699,
+            " the": -3.278017997741699
+          },
+          {
+            " city": -0.7566961050033569,
+            " must": -2.2566962242126465,
+            " beautiful": -2.7566962242126465,
+            " place": -3.3816962242126465,
+            " popular": -3.4441962242126465
+          },
+          {
+            " of": -1.0501012802124023,
+            " that": -1.3001012802124023,
+            " like": -2.0501012802124023,
+            " steep": -2.9251012802124023,
+            " known": -3.4251012802124023
+          },
+          {
+            " romance": -1.8981225490570068,
+            " grand": -2.085622549057007,
+            " beauty": -2.523122549057007,
+            " love": -2.835622549057007,
+            " great": -3.148122549057007
+          },
+          {
+            ",": -0.39764267206192017,
+            " and": -1.1476426124572754,
+            ".": -5.522642612457275,
+            " that": -6.897642612457275,
+            " ,": -6.960142612457275
+          },
+          {
+            " art": -1.0704760551452637,
+            " fashion": -1.5704760551452637,
+            " beauty": -1.9454760551452637,
+            " history": -2.1954760551452637,
+            " culture": -3.6954760551452637
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 6,
+          "total_tokens": 12,
+          "completion_tokens": 6,
+          "prompt_tokens_details": null
+        }
+      },
+      {
+        "name": "completion_logprobs_long",
+        "kind": "completion",
+        "prompt": "In a heterogeneous inference system, GPU prefill creates the KV cache, then CPU decode attention reads that cache. The next generated word is",
+        "text": " then written to the KV cache. This",
+        "finish_reason": "length",
+        "token_ids": [
+          1243,
+          5439,
+          311,
+          279,
+          85748,
+          6636,
+          13,
+          1115
+        ],
+        "tokens": [
+          " then",
+          " written",
+          " to",
+          " the",
+          " KV",
+          " cache",
+          ".",
+          " This"
+        ],
+        "token_logprobs": [
+          -1.8354268074035645,
+          -2.0642929077148438,
+          -0.6131289005279541,
+          -0.34098491072654724,
+          -1.0197370052337646,
+          -0.018721310421824455,
+          -1.2714744806289673,
+          -1.8731486797332764
+        ],
+        "top_logprobs": [
+          {
+            " then": -1.8354268074035645,
+            " written": -2.5854268074035645,
+            " stored": -3.0229268074035645,
+            " computed": -3.1479268074035645,
+            " determined": -3.1479268074035645
+          },
+          {
+            " written": -2.0642929077148438,
+            " passed": -2.3767929077148438,
+            " sent": -2.5017929077148438,
+            " computed": -2.6892929077148438,
+            " used": -2.9392929077148438
+          },
+          {
+            " to": -0.6131289005279541,
+            " back": -1.363128900527954,
+            " into": -2.238128900527954,
+            " out": -3.738128900527954,
+            " directly": -3.988128900527954
+          },
+          {
+            " the": -0.34098491072654724,
+            " a": -2.71598482131958,
+            " that": -2.96598482131958,
+            " GPU": -3.46598482131958,
+            " memory": -4.21598482131958
+          },
+          {
+            " KV": -1.0197370052337646,
+            " cache": -1.5197370052337646,
+            " GPU": -2.1447370052337646,
+            " output": -2.9572370052337646,
+            " CPU": -3.9572370052337646
+          },
+          {
+            " cache": -0.018721310421824455,
+            " store": -5.081221103668213,
+            " memory": -6.456221103668213,
+            " Cache": -7.081221103668213,
+            " table": -7.393721103668213
+          },
+          {
+            ".": -1.2714744806289673,
+            ",": -1.5214744806289673,
+            " and": -2.6464743614196777,
+            ".\n": -2.6464743614196777,
+            " by": -2.7714743614196777
+          },
+          {
+            " This": -1.8731486797332764,
+            " The": -2.2481486797332764,
+            " In": -2.6231486797332764,
+            " However": -2.8731486797332764,
+            " If": -3.7481486797332764
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 28,
+          "total_tokens": 36,
+          "completion_tokens": 8,
+          "prompt_tokens_details": null
+        }
+      }
+    ],
+    "concurrent_chat": [
+      {
+        "name": "concurrent_math",
+        "kind": "chat",
+        "messages": [
+          {
+            "role": "user",
+            "content": "What is 3+5? Answer briefly."
+          }
+        ],
+        "content": "3 + 5 = 8.",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 45,
+          "total_tokens": 53,
+          "completion_tokens": 8,
+          "prompt_tokens_details": null
+        }
+      },
+      {
+        "name": "concurrent_city",
+        "kind": "chat",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Name the capital of Italy."
+          }
+        ],
+        "content": "The capital of Italy is Rome.",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 41,
+          "total_tokens": 49,
+          "completion_tokens": 8,
+          "prompt_tokens_details": null
+        }
+      }
+    ]
+  },
+  "summary": {
+    "completion_logprob_diffs": [
+      {
+        "name": "completion_logprobs_short",
+        "max_token_logprob_abs_diff": 0.006290793418884277
+      },
+      {
+        "name": "completion_logprobs_long",
+        "max_token_logprob_abs_diff": 0.05831432342529297
+      }
+    ],
+    "decode_cpu_fallback_q1_count": 1696,
+    "decode_cpu_fallback_q2_count": 192,
+    "prefill_cpu_fallback_q44_count": 0
+  }
+}

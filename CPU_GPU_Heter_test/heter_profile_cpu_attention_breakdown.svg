@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="470" viewBox="0 0 1040 470">
+<rect width="100%" height="100%" fill="white"/>
+<text x="520.0" y="28" font-size="18" font-family="Arial, sans-serif" text-anchor="middle" font-weight="bold">CPU Attention Python Fallback Internal Breakdown</text>
+<text x="520.0" y="50" font-size="12" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">Accumulated over all profiled decode layers/tokens</text>
+<text x="218" y="88.0" font-size="12" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">ctx=128</text>
+<rect x="230.0" y="70.0" width="686.8" height="28" fill="#1d4ed8"/>
+<text x="573.3892424173125" y="89.0" font-size="10" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">25.08s</text>
+<rect x="916.8" y="70.0" width="9.5" height="28" fill="#7c3aed"/>
+<rect x="926.3" y="70.0" width="2.2" height="28" fill="#dc2626"/>
+<rect x="928.5" y="70.0" width="0.1" height="28" fill="#16a34a"/>
+<rect x="928.6" y="70.0" width="1.4" height="28" fill="#ea580c"/>
+<text x="938.0" y="89.0" font-size="11" font-family="Arial, sans-serif" text-anchor="start" font-weight="normal">25.56s</text>
+<text x="218" y="153.10000000000002" font-size="12" font-family="Arial, sans-serif" text-anchor="end" font-weight="normal">ctx=512</text>
+<rect x="230.0" y="135.10000000000002" width="602.2" height="28" fill="#1d4ed8"/>
+<text x="531.096264052023" y="154.10000000000002" font-size="10" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">21.99s</text>
+<rect x="832.2" y="135.10000000000002" width="11.9" height="28" fill="#7c3aed"/>
+<rect x="844.1" y="135.10000000000002" width="4.6" height="28" fill="#dc2626"/>
+<rect x="848.7" y="135.10000000000002" width="0.2" height="28" fill="#16a34a"/>
+<rect x="848.9" y="135.10000000000002" width="3.7" height="28" fill="#ea580c"/>
+<text x="860.5551977299272" y="154.10000000000002" font-size="11" font-family="Arial, sans-serif" text-anchor="start" font-weight="normal">22.73s</text>
+<line x1="230" y1="210.20000000000002" x2="930" y2="210.20000000000002" stroke="#222"/>
+<line x1="230.0" y1="204.20000000000002" x2="230.0" y2="210.20000000000002" stroke="#222"/>
+<text x="230.0" y="228.20000000000002" font-size="10" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">0.0s</text>
+<line x1="370.0" y1="204.20000000000002" x2="370.0" y2="210.20000000000002" stroke="#222"/>
+<text x="370.0" y="228.20000000000002" font-size="10" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">5.1s</text>
+<line x1="510.0" y1="204.20000000000002" x2="510.0" y2="210.20000000000002" stroke="#222"/>
+<text x="510.0" y="228.20000000000002" font-size="10" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">10.2s</text>
+<line x1="650.0" y1="204.20000000000002" x2="650.0" y2="210.20000000000002" stroke="#222"/>
+<text x="650.0" y="228.20000000000002" font-size="10" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">15.3s</text>
+<line x1="790.0" y1="204.20000000000002" x2="790.0" y2="210.20000000000002" stroke="#222"/>
+<text x="790.0" y="228.20000000000002" font-size="10" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">20.4s</text>
+<line x1="930.0" y1="204.20000000000002" x2="930.0" y2="210.20000000000002" stroke="#222"/>
+<text x="930.0" y="228.20000000000002" font-size="10" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">25.6s</text>
+<text x="580.0" y="252.20000000000002" font-size="12" font-family="Arial, sans-serif" text-anchor="middle" font-weight="normal">Accumulated CPU attention time</text>
+<rect x="100" y="288.20000000000005" width="14" height="14" fill="#1d4ed8"/>
+<text x="122" y="300.20000000000005" font-size="11" font-family="Arial, sans-serif" text-anchor="start" font-weight="normal">Collect/concat paged KV</text>
+<rect x="480" y="288.20000000000005" width="14" height="14" fill="#7c3aed"/>
+<text x="502" y="300.20000000000005" font-size="11" font-family="Arial, sans-serif" text-anchor="start" font-weight="normal">GQA repeat KV</text>
+<rect x="100" y="312.20000000000005" width="14" height="14" fill="#dc2626"/>
+<text x="122" y="324.20000000000005" font-size="11" font-family="Arial, sans-serif" text-anchor="start" font-weight="normal">QK matmul</text>
+<rect x="480" y="312.20000000000005" width="14" height="14" fill="#16a34a"/>
+<text x="502" y="324.20000000000005" font-size="11" font-family="Arial, sans-serif" text-anchor="start" font-weight="normal">Softmax</text>
+<rect x="100" y="336.20000000000005" width="14" height="14" fill="#ea580c"/>
+<text x="122" y="348.20000000000005" font-size="11" font-family="Arial, sans-serif" text-anchor="start" font-weight="normal">PV matmul</text>
+</svg>

@@ -2,6 +2,9 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
 from typing import TYPE_CHECKING, Any
+import json
+import os
+import time
 
 import torch
 import torch.nn as nn
@@ -50,6 +53,100 @@ if TYPE_CHECKING:
     from vllm.model_executor.layers.attention import MLAAttention
 
 logger = init_logger(__name__)
+
+
+def _heter_cpu_attention_enabled() -> bool:
+    return os.environ.get("VLLM_HETER_DISABLE_CPU_ATTENTION", "0") != "1"
+
+
+def _heter_profile_enabled() -> bool:
+    return os.environ.get("VLLM_HETER_PROFILE", "0") == "1"
+
+
+def _heter_profile_record(
+    event: str,
+    elapsed_s: float,
+    layer_name: str | None = None,
+    **fields: Any,
+) -> None:
+    if not _heter_profile_enabled():
+        return
+    path = os.environ.get(
+        "VLLM_HETER_PROFILE_PATH",
+        "/tmp/vllm_heter_profile_events.jsonl",
+    )
+    record = {
+        "event": event,
+        "elapsed_s": elapsed_s,
+        "pid": os.getpid(),
+        "ts": time.time(),
+    }
+    if layer_name is not None:
+        record["layer"] = layer_name
+    record.update(fields)
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def _heter_query_lens(attn_metadata: AttentionMetadata | None) -> torch.Tensor | None:
+    """Return per-request query lengths when metadata exposes query_start_loc."""
+    if attn_metadata is None:
+        return None
+    query_start_loc = getattr(attn_metadata, "query_start_loc", None)
+    if not isinstance(query_start_loc, torch.Tensor) or query_start_loc.numel() < 2:
+        return None
+    return query_start_loc[1:] - query_start_loc[:-1]
+
+
+def _heter_is_pure_decode(attn_metadata: AttentionMetadata | None) -> bool:
+    """True only when every active request is a real single-token decode."""
+    if attn_metadata is None:
+        return False
+
+    max_query_len = getattr(attn_metadata, "max_query_len", None)
+    if max_query_len is not None and max_query_len != 1:
+        return False
+
+    query_lens = _heter_query_lens(attn_metadata)
+    seq_lens = getattr(attn_metadata, "seq_lens", None)
+    if isinstance(query_lens, torch.Tensor) and isinstance(seq_lens, torch.Tensor):
+        seq_lens = seq_lens[: query_lens.shape[0]]
+        active = query_lens > 0
+        if not bool(torch.any(active).item()):
+            return False
+        # Decode has a non-empty context before the newly scheduled token.
+        return bool(
+            torch.all((query_lens[active] == 1) &
+                      (seq_lens[active] > query_lens[active])).item()
+        )
+
+    num_prefill_tokens = getattr(attn_metadata, "num_prefill_tokens", None)
+    num_decode_tokens = getattr(attn_metadata, "num_decode_tokens", None)
+    if num_prefill_tokens is not None and num_decode_tokens is not None:
+        return num_prefill_tokens == 0 and num_decode_tokens > 0
+
+    return False
+
+
+def _heter_should_sync_full_kv_to_cpu(
+    attn_metadata: AttentionMetadata | None,
+) -> bool:
+    """Sync full GPU KV cache after any non-pure-decode attention step."""
+    if attn_metadata is None:
+        return False
+    query_lens = _heter_query_lens(attn_metadata)
+    if isinstance(query_lens, torch.Tensor):
+        return bool(torch.any(query_lens > 0).item()) and not _heter_is_pure_decode(
+            attn_metadata
+        )
+
+    num_prefill_tokens = getattr(attn_metadata, "num_prefill_tokens", None)
+    if num_prefill_tokens is not None:
+        return num_prefill_tokens > 0
+    return False
 
 
 def validate_kv_sharing_target(
@@ -189,6 +286,7 @@ def _cpu_attn_reshape_and_cache_fallback(
     """Python fallback for cpu_attn_reshape_and_cache.
     Layout: [num_blocks, num_kv_heads, block_size, head_size]
     """
+    profile_start = time.perf_counter() if _heter_profile_enabled() else None
     block_size = key_cache.shape[2]
     for i, slot in enumerate(slot_mapping):
         slot_val = int(slot.item())
@@ -198,6 +296,12 @@ def _cpu_attn_reshape_and_cache_fallback(
         block_offset = slot_val % block_size
         key_cache[block_idx, :, block_offset, :] = key[i]
         value_cache[block_idx, :, block_offset, :] = value[i]
+    if profile_start is not None:
+        _heter_profile_record(
+            "cpu_decode_kv_cache_write_python",
+            time.perf_counter() - profile_start,
+            tokens=int(slot_mapping.numel()),
+        )
 
 
 # 全局标记文件路径，用于端到端测试验证 Decode CPU Attention 是否被执行
@@ -232,6 +336,13 @@ def _cpu_paged_attention_fallback(
     except Exception:
         pass
 
+    profile_total = time.perf_counter() if _heter_profile_enabled() else None
+    profile_collect = 0.0
+    profile_repeat = 0.0
+    profile_qk = 0.0
+    profile_softmax = 0.0
+    profile_pv = 0.0
+
     num_heads = query.shape[1]
     num_kv_heads = key_cache.shape[1]
     head_size = query.shape[2]
@@ -257,20 +368,29 @@ def _cpu_paged_attention_fallback(
         if not valid_blocks:
             continue
 
+        phase_start = time.perf_counter() if profile_total is not None else None
         # 从 block cache 中拼接出该序列的 K/V
         k_list = [key_cache[b] for b in valid_blocks]   # each: [num_kv_heads, block_size, head_size]
         v_list = [value_cache[b] for b in valid_blocks]
         k_seq = torch.cat(k_list, dim=1)[:, :seq_len, :]  # [num_kv_heads, seq_len, head_size]
         v_seq = torch.cat(v_list, dim=1)[:, :seq_len, :]  # [num_kv_heads, seq_len, head_size]
+        if phase_start is not None:
+            profile_collect += time.perf_counter() - phase_start
 
+        phase_start = time.perf_counter() if profile_total is not None else None
         # GQA: repeat_interleave K/V 到 num_heads
         k_seq = k_seq.repeat_interleave(num_queries_per_kv, dim=0)  # [num_heads, seq_len, head_size]
         v_seq = v_seq.repeat_interleave(num_queries_per_kv, dim=0)  # [num_heads, seq_len, head_size]
+        if phase_start is not None:
+            profile_repeat += time.perf_counter() - phase_start
 
         q_seq = query[q_start:q_end]  # [num_query_tokens, num_heads, head_size]
 
+        phase_start = time.perf_counter() if profile_total is not None else None
         # Attention scores: [num_query_tokens, num_heads, seq_len]
         scores = torch.einsum('qhd,hkd->qhk', q_seq, k_seq) * scale
+        if phase_start is not None:
+            profile_qk += time.perf_counter() - phase_start
 
         # Causal mask
         # 注意：当 q_seq.shape[0] == 1 时为典型 Decode 阶段，query 是序列最后一个
@@ -308,12 +428,35 @@ def _cpu_paged_attention_fallback(
             for h in range(num_heads):
                 scores[:, h, :] += alibi_slopes[h].item() * positions.unsqueeze(0)
 
+        phase_start = time.perf_counter() if profile_total is not None else None
         # Softmax
         scores = torch.softmax(scores, dim=-1)
+        if phase_start is not None:
+            profile_softmax += time.perf_counter() - phase_start
 
+        phase_start = time.perf_counter() if profile_total is not None else None
         # Output: [num_query_tokens, num_heads, head_size]
         out_seq = torch.einsum('qhk,hkd->qhd', scores, v_seq)
         output[q_start:q_end] = out_seq
+        if phase_start is not None:
+            profile_pv += time.perf_counter() - phase_start
+
+    if profile_total is not None:
+        total = time.perf_counter() - profile_total
+        _heter_profile_record(
+            "cpu_attention_python_total",
+            total,
+            query_tokens=int(query.shape[0]),
+            num_heads=int(num_heads),
+            num_kv_heads=int(num_kv_heads),
+            head_size=int(head_size),
+            num_seqs=int(num_seqs),
+        )
+        _heter_profile_record("cpu_attention_collect_kv", profile_collect)
+        _heter_profile_record("cpu_attention_repeat_kv", profile_repeat)
+        _heter_profile_record("cpu_attention_qk", profile_qk)
+        _heter_profile_record("cpu_attention_softmax", profile_softmax)
+        _heter_profile_record("cpu_attention_pv", profile_pv)
 
 
 def _cpu_paged_attention_fallback_fake(
@@ -684,12 +827,6 @@ class Attention(nn.Module, AttentionLayerBase):
             key = key.view(-1, self.num_kv_heads, self.head_size)
         if value is not None:
             value = value.view(-1, self.num_kv_heads, self.head_size_v)
-        # 异构系统：Prefill 阶段完成后触发 async D2H
-        forward_ctx = get_forward_context()
-        attn_metadata = forward_ctx.attn_metadata if forward_ctx is not None else None
-        num_prefill_tokens = getattr(attn_metadata, 'num_prefill_tokens', 0) if attn_metadata is not None else 0
-        if num_prefill_tokens > 0:
-            self._prefill_kv_to_cpu_async()
 
         # ==================== 统一通过 custom op 调用 attention ====================
         kv_cache_dummy_dep = None
@@ -766,6 +903,7 @@ class Attention(nn.Module, AttentionLayerBase):
         """Prefill 阶段结束后，将该层 GPU KV Cache 异步搬运到 CPU Cache。"""
         if self.cpu_kv_cache is None or self._d2h_stream is None:
             return
+        profile_start = time.perf_counter() if _heter_profile_enabled() else None
         gpu_k = self.kv_cache[0]  # [num_blocks, block_size, num_kv_heads, head_size]
         gpu_v = self.kv_cache[1]
         cpu_k = self.cpu_kv_cache[0]  # [num_blocks, num_kv_heads, block_size, head_size]
@@ -774,6 +912,14 @@ class Attention(nn.Module, AttentionLayerBase):
             # GPU layout -> CPU layout: 交换 block_size 和 num_kv_heads 维度
             cpu_k.copy_(gpu_k.permute(0, 2, 1, 3), non_blocking=True)
             cpu_v.copy_(gpu_v.permute(0, 2, 1, 3), non_blocking=True)
+        if profile_start is not None:
+            _heter_profile_record(
+                "prefill_kv_d2h_enqueue",
+                time.perf_counter() - profile_start,
+                self.layer_name,
+                num_blocks=int(gpu_k.shape[0]),
+                block_size=int(gpu_k.shape[1]),
+            )
 
     def _decode_kv_to_cpu(
         self,
@@ -783,9 +929,18 @@ class Attention(nn.Module, AttentionLayerBase):
     ) -> None:
         """Decode 阶段，将新生成的 K/V 写入 CPU Paged Cache。"""
         assert self.cpu_kv_cache is not None
+        profile_start = time.perf_counter() if _heter_profile_enabled() else None
         key_cpu = key.to('cpu', non_blocking=False)
         value_cpu = value.to('cpu', non_blocking=False)
         slot_mapping_cpu = slot_mapping.to('cpu', non_blocking=False)
+        if profile_start is not None:
+            _heter_profile_record(
+                "decode_kv_d2h",
+                time.perf_counter() - profile_start,
+                self.layer_name,
+                tokens=int(key.shape[0]),
+            )
+            profile_start = time.perf_counter()
         cpu_k_cache, cpu_v_cache = self.cpu_kv_cache.unbind(0)
         # 调用 vLLM CPU 版本的 KV Cache 写入 kernel
         if hasattr(torch.ops._C, 'cpu_attn_reshape_and_cache'):
@@ -801,9 +956,17 @@ class Attention(nn.Module, AttentionLayerBase):
             _cpu_attn_reshape_and_cache_fallback(
                 key_cpu, value_cpu, cpu_k_cache, cpu_v_cache, slot_mapping_cpu
             )
+        if profile_start is not None:
+            _heter_profile_record(
+                "decode_kv_cache_write_total",
+                time.perf_counter() - profile_start,
+                self.layer_name,
+                tokens=int(slot_mapping_cpu.numel()),
+            )
 
     def _build_cpu_metadata(self, attn_metadata) -> dict:
         """将 GPU attn_metadata 中的关键 tensor 搬到 CPU，供 CPU Attention kernel 使用。"""
+        profile_start = time.perf_counter() if _heter_profile_enabled() else None
         cpu_meta = {
             'query_start_loc': attn_metadata.query_start_loc.cpu(),
             'seq_lens': attn_metadata.seq_lens.cpu(),
@@ -818,6 +981,13 @@ class Attention(nn.Module, AttentionLayerBase):
             cpu_meta['scheduler_metadata'] = attn_metadata.scheduler_metadata.cpu()
         else:
             cpu_meta['scheduler_metadata'] = torch.empty(0)
+        if profile_start is not None:
+            _heter_profile_record(
+                "decode_metadata_d2h",
+                time.perf_counter() - profile_start,
+                self.layer_name,
+                block_table_shape=list(cpu_meta['block_table'].shape),
+            )
         return cpu_meta
 
     def _cpu_paged_attention(
@@ -827,6 +997,7 @@ class Attention(nn.Module, AttentionLayerBase):
         cpu_metadata: dict,
     ) -> None:
         """调用 vLLM CPU 版本的 Paged Attention Kernel。"""
+        profile_start = time.perf_counter() if _heter_profile_enabled() else None
         # 调试标记：只要进入此方法就创建标记文件
         try:
             with open(_CPU_ATTENTION_EXECUTED_FLAG, "w") as f:
@@ -854,6 +1025,13 @@ class Attention(nn.Module, AttentionLayerBase):
                 scheduler_metadata,
                 self.sinks,
             )
+            if profile_start is not None:
+                _heter_profile_record(
+                    "cpu_attention_cpp_total",
+                    time.perf_counter() - profile_start,
+                    self.layer_name,
+                    query_tokens=int(query_cpu.shape[0]),
+                )
         else:
             # Fallback：Python 实现的 Paged Attention（性能较低，用于快速验证）
             logger.info(
@@ -874,6 +1052,13 @@ class Attention(nn.Module, AttentionLayerBase):
                 scheduler_metadata,
                 self.sinks if self.sinks is not None else torch.empty(0),
             )
+            if profile_start is not None:
+                _heter_profile_record(
+                    "cpu_attention_python_wrapper",
+                    time.perf_counter() - profile_start,
+                    self.layer_name,
+                    query_tokens=int(query_cpu.shape[0]),
+                )
 
     def calc_kv_scales(self, query, key, value):
         self._q_scale.copy_(torch.abs(query).max() / self.q_range)
@@ -1100,16 +1285,24 @@ def unified_attention_with_output(
     # 因此可以安全地进行跨设备（GPU->CPU->GPU）操作。
     # 注意：使用 is_cudagraph_capturing() 而非 torch.cuda.is_current_stream_capturing()
     # 因为前者在 profile/warmup 期间也为 True，可以避免 dummy run 走 CPU 路径。
-    num_prefill_tokens = getattr(attn_metadata, 'num_prefill_tokens', 0) if attn_metadata is not None else 0
     if (
-        (num_prefill_tokens == 0)
-        and (query.numel() > 0)
+        _heter_cpu_attention_enabled()
         and (not is_cudagraph_capturing())
+        and _heter_is_pure_decode(attn_metadata)
+        and (query.numel() > 0)
         and (self.cpu_kv_cache is not None)
     ):
+        profile_decode_start = time.perf_counter() if _heter_profile_enabled() else None
         # 1. 等待该层之前 Prefill 的 async D2H 完成
         if self._d2h_stream is not None:
+            profile_start = time.perf_counter() if profile_decode_start is not None else None
             torch.cuda.current_stream().wait_stream(self._d2h_stream)
+            if profile_start is not None:
+                _heter_profile_record(
+                    "decode_wait_prefill_d2h",
+                    time.perf_counter() - profile_start,
+                    self.layer_name,
+                )
 
         # 2. K/V 搬到 CPU，写入 CPU Paged Cache
         if key is not None and value is not None and attn_metadata is not None:
@@ -1118,13 +1311,29 @@ def unified_attention_with_output(
                 self._decode_kv_to_cpu(key, value, slot_mapping)
 
         # 3. Q 搬到 CPU，分配 CPU output
+        profile_start = time.perf_counter() if profile_decode_start is not None else None
         query_cpu = query.to('cpu', non_blocking=False)
+        if profile_start is not None:
+            _heter_profile_record(
+                "decode_query_d2h",
+                time.perf_counter() - profile_start,
+                self.layer_name,
+                query_tokens=int(query.shape[0]),
+            )
+            profile_start = time.perf_counter()
         output_cpu = torch.empty(
             (query.shape[0], self.num_heads, self.head_size_v),
             dtype=output.dtype,
             device='cpu',
             pin_memory=True,
         )
+        if profile_start is not None:
+            _heter_profile_record(
+                "decode_output_cpu_alloc",
+                time.perf_counter() - profile_start,
+                self.layer_name,
+                query_tokens=int(query.shape[0]),
+            )
 
         # 4. 构造 CPU metadata 并执行 CPU Paged Attention
         if attn_metadata is not None:
@@ -1132,10 +1341,29 @@ def unified_attention_with_output(
             self._cpu_paged_attention(query_cpu, output_cpu, cpu_metadata)
 
         # 5. Output 搬回 GPU
+        profile_start = time.perf_counter() if profile_decode_start is not None else None
         output.copy_(output_cpu.to(query.device, non_blocking=False))
+        if profile_start is not None:
+            _heter_profile_record(
+                "decode_output_h2d",
+                time.perf_counter() - profile_start,
+                self.layer_name,
+                query_tokens=int(query.shape[0]),
+            )
+            _heter_profile_record(
+                "decode_cpu_path_layer_total",
+                time.perf_counter() - profile_decode_start,
+                self.layer_name,
+                query_tokens=int(query.shape[0]),
+            )
         return
 
     # ==================== GPU 路径（原有逻辑）====================
+    profile_gpu_start = (
+        time.perf_counter()
+        if _heter_profile_enabled() and not is_cudagraph_capturing()
+        else None
+    )
     self.impl.forward(
         self,
         query,
@@ -1147,6 +1375,18 @@ def unified_attention_with_output(
         output_scale=output_scale,
         output_block_scale=output_block_scale,
     )
+    if profile_gpu_start is not None:
+        _heter_profile_record(
+            "gpu_attention_forward",
+            time.perf_counter() - profile_gpu_start,
+            self.layer_name,
+            pure_decode=bool(_heter_is_pure_decode(attn_metadata)),
+            query_tokens=int(query.shape[0]) if query is not None else 0,
+        )
+    if (_heter_cpu_attention_enabled()
+            and not is_cudagraph_capturing()
+            and _heter_should_sync_full_kv_to_cpu(attn_metadata)):
+        self._prefill_kv_to_cpu_async()
 
 
 def unified_attention_with_output_fake(

@@ -127,11 +127,13 @@ def test_forward_path_selection():
     slot_mapping = torch.zeros(batch_size * seq_len, dtype=torch.long, device="cuda:0")
     sliding_window_blocks = 4096 // block_size
 
-    # 构造 mock 的 attn_metadata（无 prefill token）
+    # 构造 mock 的 attn_metadata（FlashAttentionMetadata 风格，无 num_prefill_tokens）
     mock_attn_meta = MagicMock()
-    mock_attn_meta.num_prefill_tokens = 0  # pure decode
-    mock_attn_meta.num_decode_tokens = batch_size * seq_len
-    mock_attn_meta.max_decode_seq_len = seq_len
+    mock_attn_meta.query_start_loc = torch.tensor(
+        [0, batch_size * seq_len], dtype=torch.int32, device="cuda:0")
+    mock_attn_meta.seq_lens = torch.tensor(
+        [batch_size * seq_len], dtype=torch.int32, device="cuda:0")
+    mock_attn_meta.max_query_len = batch_size * seq_len
     mock_attn_meta.use_cascade = False
     mock_attn_meta.decode_cascade_uses_spec = False
     mock_attn_meta.slot_mapping = None
@@ -163,8 +165,11 @@ def test_forward_path_selection():
                     return False
 
             # 分支 2：非 Graph Capture + 有 prefill token（GPU 路径）
-            mock_attn_meta.num_prefill_tokens = batch_size * seq_len
-            mock_attn_meta.num_decode_tokens = 0
+            mock_attn_meta.query_start_loc = torch.tensor(
+                [0, batch_size * seq_len], dtype=torch.int32, device="cuda:0")
+            mock_attn_meta.seq_lens = torch.tensor(
+                [batch_size * seq_len], dtype=torch.int32, device="cuda:0")
+            mock_attn_meta.max_query_len = batch_size * seq_len
             try:
                 attn.forward(query, key, value)
                 print("  ✓ Prefill 阶段 forward 成功（GPU 路径）")
@@ -174,8 +179,21 @@ def test_forward_path_selection():
                 return False
 
         # 分支 3：非 Graph Capture + 无 prefill token（Decode CPU 路径）
-        mock_attn_meta.num_prefill_tokens = 0
-        mock_attn_meta.num_decode_tokens = batch_size * seq_len
+        decode_tokens = batch_size
+        decode_query = torch.randn(
+            decode_tokens, num_heads, head_size,
+            dtype=torch.float16, device="cuda:0")
+        decode_key = torch.randn(
+            decode_tokens, num_kv_heads, head_size,
+            dtype=torch.float16, device="cuda:0")
+        decode_value = torch.randn(
+            decode_tokens, num_kv_heads, head_size,
+            dtype=torch.float16, device="cuda:0")
+        mock_attn_meta.query_start_loc = torch.tensor(
+            [0, 1, 2], dtype=torch.int32, device="cuda:0")
+        mock_attn_meta.seq_lens = torch.tensor(
+            [seq_len + 1, seq_len + 1], dtype=torch.int32, device="cuda:0")
+        mock_attn_meta.max_query_len = 1
 
         # 在 unified_attention_with_output custom op 内部会通过 get_attention_context
         # 获取 self，因此需要 mock 该函数返回真实的 attn 对象
@@ -199,7 +217,7 @@ def test_forward_path_selection():
                 with patch.object(attn, '_decode_kv_to_cpu', side_effect=mock_decode_kv_to_cpu):
                     with patch.object(attn_module, 'is_cudagraph_capturing', return_value=False):
                         try:
-                            attn.forward(query, key, value)
+                            attn.forward(decode_query, decode_key, decode_value)
                             if cpu_attn_called[0]:
                                 print("  ✓ Decode 阶段 forward 成功，且调用了 _cpu_paged_attention（CPU 路径）")
                             else:
