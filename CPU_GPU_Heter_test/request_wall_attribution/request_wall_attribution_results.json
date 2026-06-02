@@ -1,0 +1,710 @@
+{
+  "timestamp_utc": "2026-05-27 06:30:56 UTC",
+  "model": "/home/zb/data/model_data/models/LLM-Research/Meta-Llama-3.1-8B-Instruct",
+  "prompt_len": 8000,
+  "output_len": 400,
+  "batch_size": 1,
+  "omp_threads": 120,
+  "port": 8036,
+  "affinity": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123",
+  "groups": [
+    {
+      "name": "A_baseline_no_request_profile",
+      "description": "低扰动 attention memory profile；关闭 request profile。",
+      "request_profile": "off",
+      "attention_profile": "memory",
+      "request_wall_s": 21.694837732007727,
+      "usage": {
+        "prompt_tokens": 8001,
+        "total_tokens": 8401,
+        "completion_tokens": 400,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "request_events": {},
+      "attention_events": {
+        "cpu_attention_cpp_total": {
+          "count": 12768,
+          "total_s": 6.487124685372692,
+          "max_ms": 27.765578008256853,
+          "avg_ms": 0.5080768080649039
+        },
+        "decode_cpu_path_layer_total": {
+          "count": 12768,
+          "total_s": 11.291904340789188,
+          "max_ms": 138.24434200068936,
+          "avg_ms": 0.8843910041344915
+        },
+        "decode_cpu_scheduler_metadata": {
+          "count": 12768,
+          "total_s": 0.2719767356174998,
+          "max_ms": 0.12395100202411413,
+          "avg_ms": 0.021301436060267843
+        },
+        "decode_kv_cache_write_total": {
+          "count": 12768,
+          "total_s": 0.7026432150159962,
+          "max_ms": 14.20586701715365,
+          "avg_ms": 0.05503158012343329
+        },
+        "decode_kv_d2h": {
+          "count": 12768,
+          "total_s": 0.6997414111392573,
+          "max_ms": 0.7210439653135836,
+          "avg_ms": 0.05480430851654584
+        },
+        "decode_metadata_d2h": {
+          "count": 12768,
+          "total_s": 1.2130714725935832,
+          "max_ms": 136.98304595891386,
+          "avg_ms": 0.09500873062293101
+        },
+        "decode_output_cpu_alloc": {
+          "count": 12768,
+          "total_s": 0.1123379910713993,
+          "max_ms": 0.041791005060076714,
+          "avg_ms": 0.00879840155634393
+        },
+        "decode_output_h2d": {
+          "count": 12768,
+          "total_s": 0.6192814178648405,
+          "max_ms": 0.26212999364361167,
+          "avg_ms": 0.0485026173139756
+        },
+        "decode_query_d2h": {
+          "count": 12768,
+          "total_s": 0.22481277730548754,
+          "max_ms": 0.181559007614851,
+          "avg_ms": 0.017607517019540064
+        },
+        "decode_wait_prefill_d2h": {
+          "count": 12768,
+          "total_s": 0.47689432610059157,
+          "max_ms": 0.2216949942521751,
+          "avg_ms": 0.03735074609183831
+        },
+        "gpu_attention_forward": {
+          "count": 96,
+          "total_s": 0.005009459797292948,
+          "max_ms": 1.1113539803773165,
+          "avg_ms": 0.052181872888468206
+        },
+        "prefill_kv_d2h_enqueue": {
+          "count": 32,
+          "total_s": 0.01309694309020415,
+          "max_ms": 2.002857974730432,
+          "avg_ms": 0.40927947156887967
+        }
+      },
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/request_wall_attribution/A_baseline_no_request_profile_server.log",
+      "request_jsonl": null,
+      "request_summary_files": [],
+      "attention_summary_files": [
+        "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/request_wall_attribution/A_baseline_no_request_profile_attention_summary.pid949989.json"
+      ]
+    },
+    {
+      "name": "B_request_memory",
+      "description": "request profile 内存聚合；attention profile 也使用 memory。",
+      "request_profile": "memory",
+      "attention_profile": "memory",
+      "request_wall_s": 23.223930993000977,
+      "usage": {
+        "prompt_tokens": 8001,
+        "total_tokens": 8401,
+        "completion_tokens": 400,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "request_events": {
+        "openai_completion_build_response": {
+          "count": 1,
+          "total_s": 0.00026181997964158654,
+          "max_ms": 0.26181997964158654,
+          "avg_ms": 0.26181997964158654
+        },
+        "openai_completion_create_total": {
+          "count": 1,
+          "total_s": 23.21321092202561,
+          "max_ms": 23213.21092202561,
+          "avg_ms": 23213.21092202561
+        },
+        "openai_completion_generate_iteration": {
+          "count": 1,
+          "total_s": 23.190648050047457,
+          "max_ms": 23190.648050047457,
+          "avg_ms": 23190.648050047457
+        },
+        "openai_completion_render_request": {
+          "count": 1,
+          "total_s": 0.021656116005033255,
+          "max_ms": 21.656116005033255,
+          "avg_ms": 21.656116005033255
+        },
+        "output_processor_process_one_output": {
+          "count": 400,
+          "total_s": 0.029855021042749286,
+          "max_ms": 5.270859051961452,
+          "avg_ms": 0.07463755260687321
+        },
+        "output_processor_process_outputs_total": {
+          "count": 400,
+          "total_s": 0.041626969061326236,
+          "max_ms": 5.316113005392253,
+          "avg_ms": 0.10406742265331559
+        },
+        "engine_core_execute_model_submit": {
+          "count": 402,
+          "total_s": 22.8608303295332,
+          "max_ms": 420.1197869842872,
+          "avg_ms": 56.86773713814229
+        },
+        "engine_core_get_grammar_bitmask": {
+          "count": 400,
+          "total_s": 0.000967653701081872,
+          "max_ms": 0.007325026672333479,
+          "avg_ms": 0.00241913425270468
+        },
+        "engine_core_process_aborts": {
+          "count": 402,
+          "total_s": 0.0015035919495858252,
+          "max_ms": 0.032675976399332285,
+          "avg_ms": 0.003740278481556779
+        },
+        "engine_core_sample_tokens_call_submit": {
+          "count": 400,
+          "total_s": 0.1883840535301715,
+          "max_ms": 0.8333869627676904,
+          "avg_ms": 0.4709601338254288
+        },
+        "engine_core_schedule": {
+          "count": 402,
+          "total_s": 0.04733317357022315,
+          "max_ms": 1.107440039049834,
+          "avg_ms": 0.11774421286125161
+        },
+        "engine_core_scheduler_update_from_output": {
+          "count": 402,
+          "total_s": 0.03370707842987031,
+          "max_ms": 0.27435197262093425,
+          "avg_ms": 0.08384845380564754
+        },
+        "engine_core_step_enqueue_total": {
+          "count": 402,
+          "total_s": 23.10987598862266,
+          "max_ms": 422.483918024227,
+          "avg_ms": 57.487253703041446
+        },
+        "engine_core_wait_model_or_sample_future": {
+          "count": 402,
+          "total_s": 0.0016415233840234578,
+          "max_ms": 0.1267299521714449,
+          "avg_ms": 0.004083391502545915
+        },
+        "gpu_model_runner_apply_grammar_bitmask": {
+          "count": 400,
+          "total_s": 0.00016625632997602224,
+          "max_ms": 0.0018290011212229729,
+          "avg_ms": 0.0004156408249400556
+        },
+        "gpu_model_runner_bookkeeping_sync": {
+          "count": 400,
+          "total_s": 0.03582746215397492,
+          "max_ms": 0.1268030027858913,
+          "avg_ms": 0.0895686553849373
+        },
+        "gpu_model_runner_build_async_output": {
+          "count": 400,
+          "total_s": 0.04563485115068033,
+          "max_ms": 0.15624798834323883,
+          "avg_ms": 0.11408712787670083
+        },
+        "gpu_model_runner_build_output": {
+          "count": 400,
+          "total_s": 0.003635981061961502,
+          "max_ms": 0.02748798578977585,
+          "avg_ms": 0.009089952654903755
+        },
+        "gpu_model_runner_debug_log_write": {
+          "count": 799,
+          "total_s": 0.04836223635356873,
+          "max_ms": 0.2518089604564011,
+          "avg_ms": 0.06052845601197589
+        },
+        "gpu_model_runner_deferred_state_corrections": {
+          "count": 400,
+          "total_s": 0.00018120487220585346,
+          "max_ms": 0.0017560087144374847,
+          "avg_ms": 0.00045301218051463366
+        },
+        "gpu_model_runner_eplb_step": {
+          "count": 400,
+          "total_s": 0.001454777957405895,
+          "max_ms": 0.013504002708941698,
+          "avg_ms": 0.0036369448935147375
+        },
+        "gpu_model_runner_execute_model_total": {
+          "count": 400,
+          "total_s": 22.80997272056993,
+          "max_ms": 419.90027797874063,
+          "avg_ms": 57.02493180142483
+        },
+        "gpu_model_runner_finalize_kv_connector": {
+          "count": 400,
+          "total_s": 0.00011613877722993493,
+          "max_ms": 0.0004870234988629818,
+          "avg_ms": 0.0002903469430748373
+        },
+        "gpu_model_runner_model_forward": {
+          "count": 400,
+          "total_s": 22.031090310716536,
+          "max_ms": 401.44309401512146,
+          "avg_ms": 55.07772577679134
+        },
+        "gpu_model_runner_postprocess_total": {
+          "count": 400,
+          "total_s": 0.09057185117853805,
+          "max_ms": 11.132875981274992,
+          "avg_ms": 0.22642962794634514
+        },
+        "gpu_model_runner_preprocess_total": {
+          "count": 400,
+          "total_s": 0.6196599774993956,
+          "max_ms": 7.17462197644636,
+          "avg_ms": 1.549149943748489
+        },
+        "gpu_model_runner_sample_kernel_total": {
+          "count": 400,
+          "total_s": 0.04940247145714238,
+          "max_ms": 0.2125619794242084,
+          "avg_ms": 0.12350617864285597
+        },
+        "gpu_model_runner_sample_tokens_total": {
+          "count": 400,
+          "total_s": 0.15601566748227924,
+          "max_ms": 0.5297180032357574,
+          "avg_ms": 0.3900391687056981
+        },
+        "gpu_model_runner_set_async_sampled_token_ids": {
+          "count": 400,
+          "total_s": 0.0009634881280362606,
+          "max_ms": 0.01461902866140008,
+          "avg_ms": 0.0024087203200906515
+        },
+        "gpu_model_runner_update_states_after_execute": {
+          "count": 400,
+          "total_s": 0.0005511105409823358,
+          "max_ms": 0.003969995304942131,
+          "avg_ms": 0.0013777763524558395
+        },
+        "gpu_worker_execute_model_total": {
+          "count": 402,
+          "total_s": 22.838043820520397,
+          "max_ms": 420.0115610146895,
+          "avg_ms": 56.811054279901484
+        },
+        "gpu_worker_model_runner_execute_model": {
+          "count": 402,
+          "total_s": 22.827797258272767,
+          "max_ms": 419.94913102826104,
+          "avg_ms": 56.78556531908648
+        },
+        "gpu_worker_sample_tokens_total": {
+          "count": 400,
+          "total_s": 0.1635751918074675,
+          "max_ms": 0.552334007807076,
+          "avg_ms": 0.4089379795186687
+        },
+        "gpu_worker_wait_pp_send": {
+          "count": 402,
+          "total_s": 0.00027903274167329073,
+          "max_ms": 0.0020400038920342922,
+          "avg_ms": 0.0006941112976947531
+        }
+      },
+      "attention_events": {
+        "cpu_attention_cpp_total": {
+          "count": 12768,
+          "total_s": 6.518805467756465,
+          "max_ms": 9.895129012875259,
+          "avg_ms": 0.5105580723493471
+        },
+        "decode_cpu_path_layer_total": {
+          "count": 12768,
+          "total_s": 11.68101126916008,
+          "max_ms": 26.28165698843077,
+          "avg_ms": 0.9148661708302068
+        },
+        "decode_cpu_scheduler_metadata": {
+          "count": 12768,
+          "total_s": 0.3063198564341292,
+          "max_ms": 0.11423800606280565,
+          "avg_ms": 0.023991216825981293
+        },
+        "decode_kv_cache_write_total": {
+          "count": 12768,
+          "total_s": 0.7205101558938622,
+          "max_ms": 11.572589981369674,
+          "avg_ms": 0.056430933262363904
+        },
+        "decode_kv_d2h": {
+          "count": 12768,
+          "total_s": 0.7504901693901047,
+          "max_ms": 0.3594480222091079,
+          "avg_ms": 0.058778991963510704
+        },
+        "decode_metadata_d2h": {
+          "count": 12768,
+          "total_s": 1.2114496614667587,
+          "max_ms": 0.2528830082155764,
+          "avg_ms": 0.09488170907477747
+        },
+        "decode_output_cpu_alloc": {
+          "count": 12768,
+          "total_s": 0.12341815902618691,
+          "max_ms": 0.05750404670834541,
+          "avg_ms": 0.009666209196913135
+        },
+        "decode_output_h2d": {
+          "count": 12768,
+          "total_s": 0.6931863699574023,
+          "max_ms": 0.5613770335912704,
+          "avg_ms": 0.05429091243400708
+        },
+        "decode_query_d2h": {
+          "count": 12768,
+          "total_s": 0.24773115193238482,
+          "max_ms": 3.3717709593474865,
+          "avg_ms": 0.019402502500969986
+        },
+        "decode_wait_prefill_d2h": {
+          "count": 12768,
+          "total_s": 0.5244088476756588,
+          "max_ms": 0.19659398822113872,
+          "avg_ms": 0.041072121528482046
+        },
+        "gpu_attention_forward": {
+          "count": 96,
+          "total_s": 0.004350409202743322,
+          "max_ms": 1.0603080154396594,
+          "avg_ms": 0.04531676252857627
+        },
+        "prefill_kv_d2h_enqueue": {
+          "count": 32,
+          "total_s": 0.010994647338520736,
+          "max_ms": 1.9110750290565193,
+          "avg_ms": 0.343582729328773
+        }
+      },
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/request_wall_attribution/B_request_memory_server.log",
+      "request_jsonl": null,
+      "request_summary_files": [
+        "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/request_wall_attribution/B_request_memory_request_summary.pid955215.json",
+        "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/request_wall_attribution/B_request_memory_request_summary.pid955977.json"
+      ],
+      "attention_summary_files": [
+        "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/request_wall_attribution/B_request_memory_attention_summary.pid955977.json"
+      ]
+    },
+    {
+      "name": "C_request_jsonl",
+      "description": "request profile 高频 JSONL；仅用于定位，不作为原始耗时口径。",
+      "request_profile": "jsonl",
+      "attention_profile": "memory",
+      "request_wall_s": 21.327096025983337,
+      "usage": {
+        "prompt_tokens": 8001,
+        "total_tokens": 8401,
+        "completion_tokens": 400,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "request_events": {
+        "openai_completion_render_request": {
+          "count": 1,
+          "total_s": 0.01948761398671195,
+          "max_ms": 19.48761398671195,
+          "avg_ms": 19.48761398671195
+        },
+        "engine_core_schedule": {
+          "count": 402,
+          "total_s": 0.04225707578007132,
+          "max_ms": 1.8311189487576485,
+          "avg_ms": 0.10511710393052566
+        },
+        "gpu_worker_wait_pp_send": {
+          "count": 402,
+          "total_s": 0.00023056892678141594,
+          "max_ms": 0.0028679496608674526,
+          "avg_ms": 0.0005735545442323779
+        },
+        "gpu_model_runner_debug_log_write": {
+          "count": 799,
+          "total_s": 0.03770856524351984,
+          "max_ms": 0.39688096148893237,
+          "avg_ms": 0.04719469992931145
+        },
+        "gpu_model_runner_preprocess_total": {
+          "count": 400,
+          "total_s": 0.5367753719328903,
+          "max_ms": 6.613311008550227,
+          "avg_ms": 1.3419384298322257
+        },
+        "gpu_model_runner_model_forward": {
+          "count": 400,
+          "total_s": 19.74340395402396,
+          "max_ms": 429.38299500383437,
+          "avg_ms": 49.3585098850599
+        },
+        "gpu_model_runner_postprocess_total": {
+          "count": 400,
+          "total_s": 0.08720294892555103,
+          "max_ms": 11.260200990363955,
+          "avg_ms": 0.21800737231387757
+        },
+        "gpu_model_runner_deferred_state_corrections": {
+          "count": 400,
+          "total_s": 0.0001875516609288752,
+          "max_ms": 0.001801003236323595,
+          "avg_ms": 0.000468879152322188
+        },
+        "gpu_model_runner_execute_model_total": {
+          "count": 400,
+          "total_s": 20.5738405463635,
+          "max_ms": 447.8524370351806,
+          "avg_ms": 51.43460136590875
+        },
+        "gpu_worker_model_runner_execute_model": {
+          "count": 402,
+          "total_s": 20.602574996766634,
+          "max_ms": 447.9551039985381,
+          "avg_ms": 51.25018655912098
+        },
+        "gpu_worker_execute_model_total": {
+          "count": 402,
+          "total_s": 20.642761553870514,
+          "max_ms": 448.2399779953994,
+          "avg_ms": 51.35015311908088
+        },
+        "engine_core_execute_model_submit": {
+          "count": 402,
+          "total_s": 20.676428690901957,
+          "max_ms": 448.5484579927288,
+          "avg_ms": 51.433902216174026
+        },
+        "engine_core_get_grammar_bitmask": {
+          "count": 400,
+          "total_s": 0.0008640923188067973,
+          "max_ms": 0.008702976629137993,
+          "avg_ms": 0.002160230797016993
+        },
+        "gpu_model_runner_apply_grammar_bitmask": {
+          "count": 400,
+          "total_s": 0.00016334594693034887,
+          "max_ms": 0.007943017408251762,
+          "avg_ms": 0.0004083648673258722
+        },
+        "gpu_model_runner_sample_kernel_total": {
+          "count": 400,
+          "total_s": 0.048782603815197945,
+          "max_ms": 0.22022798657417297,
+          "avg_ms": 0.12195650953799486
+        },
+        "gpu_model_runner_update_states_after_execute": {
+          "count": 400,
+          "total_s": 0.0005661595496349037,
+          "max_ms": 0.003810971975326538,
+          "avg_ms": 0.0014153988740872592
+        },
+        "gpu_model_runner_bookkeeping_sync": {
+          "count": 400,
+          "total_s": 0.032329978537745774,
+          "max_ms": 0.1341740135103464,
+          "avg_ms": 0.08082494634436443
+        },
+        "gpu_model_runner_finalize_kv_connector": {
+          "count": 400,
+          "total_s": 0.00010670989286154509,
+          "max_ms": 0.0010830117389559746,
+          "avg_ms": 0.0002667747321538627
+        },
+        "gpu_model_runner_eplb_step": {
+          "count": 400,
+          "total_s": 0.0013922039652243257,
+          "max_ms": 0.01270999200642109,
+          "avg_ms": 0.003480509913060814
+        },
+        "gpu_model_runner_build_output": {
+          "count": 400,
+          "total_s": 0.0033055958920158446,
+          "max_ms": 0.025707995519042015,
+          "avg_ms": 0.008263989730039611
+        },
+        "gpu_model_runner_build_async_output": {
+          "count": 400,
+          "total_s": 0.045182675239630044,
+          "max_ms": 0.21962495520710945,
+          "avg_ms": 0.11295668809907511
+        },
+        "gpu_model_runner_set_async_sampled_token_ids": {
+          "count": 400,
+          "total_s": 0.0010597139480523765,
+          "max_ms": 0.016120029613375664,
+          "avg_ms": 0.0026492848701309413
+        },
+        "gpu_model_runner_sample_tokens_total": {
+          "count": 400,
+          "total_s": 0.254665014334023,
+          "max_ms": 1.2043159804306924,
+          "avg_ms": 0.6366625358350575
+        },
+        "gpu_worker_sample_tokens_total": {
+          "count": 400,
+          "total_s": 0.27307232411112636,
+          "max_ms": 1.2932820245623589,
+          "avg_ms": 0.6826808102778159
+        },
+        "engine_core_sample_tokens_call_submit": {
+          "count": 400,
+          "total_s": 0.3079205238027498,
+          "max_ms": 1.4235999551601708,
+          "avg_ms": 0.7698013095068745
+        },
+        "engine_core_step_enqueue_total": {
+          "count": 402,
+          "total_s": 21.165987766871694,
+          "max_ms": 452.48279703082517,
+          "avg_ms": 52.65171086286491
+        },
+        "engine_core_wait_model_or_sample_future": {
+          "count": 402,
+          "total_s": 0.0018454375676810741,
+          "max_ms": 0.023270025849342346,
+          "avg_ms": 0.004590640715624562
+        },
+        "engine_core_process_aborts": {
+          "count": 402,
+          "total_s": 0.0014900164096616209,
+          "max_ms": 0.015582016203552485,
+          "avg_ms": 0.0037065084817453258
+        },
+        "engine_core_scheduler_update_from_output": {
+          "count": 402,
+          "total_s": 0.031172623683232814,
+          "max_ms": 0.22910104598850012,
+          "avg_ms": 0.07754384000804183
+        },
+        "output_processor_process_one_output": {
+          "count": 400,
+          "total_s": 0.029628169897478074,
+          "max_ms": 4.377515986561775,
+          "avg_ms": 0.07407042474369518
+        },
+        "output_processor_process_outputs_total": {
+          "count": 400,
+          "total_s": 0.09097894397564232,
+          "max_ms": 4.519862006418407,
+          "avg_ms": 0.2274473599391058
+        },
+        "openai_completion_generate_iteration": {
+          "count": 1,
+          "total_s": 21.295294890005607,
+          "max_ms": 21295.294890005607,
+          "avg_ms": 21295.294890005607
+        },
+        "openai_completion_build_response": {
+          "count": 1,
+          "total_s": 0.00023946899455040693,
+          "max_ms": 0.23946899455040693,
+          "avg_ms": 0.23946899455040693
+        },
+        "openai_completion_create_total": {
+          "count": 1,
+          "total_s": 21.31592720001936,
+          "max_ms": 21315.92720001936,
+          "avg_ms": 21315.92720001936
+        }
+      },
+      "attention_events": {
+        "cpu_attention_cpp_total": {
+          "count": 12768,
+          "total_s": 6.222326569783036,
+          "max_ms": 2.5205310084857047,
+          "avg_ms": 0.4873376072825059
+        },
+        "decode_cpu_path_layer_total": {
+          "count": 12768,
+          "total_s": 10.646896334481426,
+          "max_ms": 7.431008038111031,
+          "avg_ms": 0.8338734597808134
+        },
+        "decode_cpu_scheduler_metadata": {
+          "count": 12768,
+          "total_s": 0.2660535531467758,
+          "max_ms": 0.08829403668642044,
+          "avg_ms": 0.020837527658738707
+        },
+        "decode_kv_cache_write_total": {
+          "count": 12768,
+          "total_s": 0.560912353801541,
+          "max_ms": 1.2302540126256645,
+          "avg_ms": 0.04393110540425603
+        },
+        "decode_kv_d2h": {
+          "count": 12768,
+          "total_s": 0.6849037252250127,
+          "max_ms": 0.13128702994436026,
+          "avg_ms": 0.05364220905584373
+        },
+        "decode_metadata_d2h": {
+          "count": 12768,
+          "total_s": 1.0617481349036098,
+          "max_ms": 2.249393961392343,
+          "avg_ms": 0.08315696545297695
+        },
+        "decode_output_cpu_alloc": {
+          "count": 12768,
+          "total_s": 0.11082200717646629,
+          "max_ms": 0.05039700772613287,
+          "avg_ms": 0.008679668481866094
+        },
+        "decode_output_h2d": {
+          "count": 12768,
+          "total_s": 0.6053215783904307,
+          "max_ms": 0.25858799926936626,
+          "avg_ms": 0.04740927149047859
+        },
+        "decode_query_d2h": {
+          "count": 12768,
+          "total_s": 0.21839662262937054,
+          "max_ms": 0.20424899412319064,
+          "avg_ms": 0.01710499863951837
+        },
+        "decode_wait_prefill_d2h": {
+          "count": 12768,
+          "total_s": 0.4771123990067281,
+          "max_ms": 0.1297009875997901,
+          "avg_ms": 0.03736782573674249
+        },
+        "gpu_attention_forward": {
+          "count": 96,
+          "total_s": 0.004726297105662525,
+          "max_ms": 1.0338550200685859,
+          "avg_ms": 0.049232261517317966
+        },
+        "prefill_kv_d2h_enqueue": {
+          "count": 32,
+          "total_s": 0.014549827843438834,
+          "max_ms": 4.108324006665498,
+          "avg_ms": 0.45468212010746356
+        }
+      },
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/request_wall_attribution/C_request_jsonl_server.log",
+      "request_jsonl": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/request_wall_attribution/C_request_jsonl_request_events.jsonl",
+      "request_summary_files": [],
+      "attention_summary_files": [
+        "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/request_wall_attribution/C_request_jsonl_attention_summary.pid961724.json"
+      ]
+    }
+  ]
+}

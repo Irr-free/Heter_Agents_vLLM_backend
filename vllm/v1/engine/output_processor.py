@@ -2,6 +2,7 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
 import asyncio
+import time
 from collections import defaultdict, deque
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -37,6 +38,7 @@ from vllm.v1.metrics.stats import (
     RequestStateStats,
     SchedulerStats,
 )
+from vllm.v1.utils import heter_request_profile_record
 
 # shared empty CPU tensor used as a placeholder pooling output
 EMPTY_CPU_TENSOR = torch.empty(0, device="cpu")
@@ -597,9 +599,11 @@ class OutputProcessor:
         within the loop below.
         """
 
+        profile_total_start = time.perf_counter()
         request_outputs: list[RequestOutput | PoolingRequestOutput] = []
         reqs_to_abort: list[str] = []
         for engine_core_output in engine_core_outputs:
+            profile_item_start = time.perf_counter()
             req_id = engine_core_output.request_id
             req_state = self.request_states.get(req_id)
             if req_state is None:
@@ -680,7 +684,18 @@ class OutputProcessor:
                     )
                     if self.tracing_enabled:
                         self.do_tracing(engine_core_output, req_state, iteration_stats)
+            heter_request_profile_record(
+                "output_processor_process_one_output",
+                time.perf_counter() - profile_item_start,
+            )
 
+        heter_request_profile_record(
+            "output_processor_process_outputs_total",
+            time.perf_counter() - profile_total_start,
+            engine_core_outputs=len(engine_core_outputs),
+            request_outputs=len(request_outputs),
+            reqs_to_abort=len(reqs_to_abort),
+        )
         return OutputProcessorOutput(
             request_outputs=request_outputs,
             reqs_to_abort=reqs_to_abort,

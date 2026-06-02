@@ -19,6 +19,7 @@ instead of embedding feature-specific logic directly.
 
 import functools
 import gc
+import os
 import time
 from copy import deepcopy
 from typing import Any, NamedTuple
@@ -995,16 +996,26 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             need_eager=is_profile or skip_compiled,
         )
 
-        # 异构系统：Pure Decode Batch 强制降级为 Eager 模式
-        # CPU Attention 无法被 CUDA Graph 捕获
-        if batch_desc.cg_mode == CUDAGraphMode.FULL and not is_profile:
+        # 异构系统：Pure Decode Batch 强制降级为 Eager 模式。
+        # CPU Attention 无法被 CUDA Graph 捕获；但纯 GPU baseline
+        # 禁用 CPU attention 时应保留原生 CUDA Graph 路径。
+        heter_force_decode_eager = (
+            os.environ.get("VLLM_HETER_DISABLE_CPU_ATTENTION", "0") != "1"
+            or os.environ.get("VLLM_HETER_FORCE_DECODE_EAGER", "0") == "1"
+        )
+        if (
+            heter_force_decode_eager
+            and batch_desc.cg_mode == CUDAGraphMode.FULL
+            and not is_profile
+        ):
             # 简单判断：如果每个 request 只调度了 1 个 token，则认为是 pure decode
             scheduled = getattr(scheduler_output, 'num_scheduled_tokens', {})
             if scheduled and all(n == 1 for n in scheduled.values()):
-                print(
-                    f"【异构系统】检测到 Pure Decode Batch，强制降级为 EAGER 模式，"
-                    f"scheduled_tokens={scheduled}"
-                )
+                if os.environ.get("VLLM_HETER_CUDAGRAPH_DEBUG", "0") == "1":
+                    print(
+                        f"【异构系统】检测到 Pure Decode Batch，强制降级为 EAGER 模式，"
+                        f"scheduled_tokens={scheduled}"
+                    )
                 batch_desc = batch_desc._replace(cg_mode=CUDAGraphMode.EAGER)
 
         if batch_desc.num_tokens == 0:

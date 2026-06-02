@@ -1,0 +1,8 @@
+*.log
+*.jsonl
+__pycache__/
+*.pyc
+core_burner
+*_summary.pid*.json
+*_partial.json*
+*.before_bound64_resume

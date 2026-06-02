@@ -4,6 +4,7 @@
 
 import gc
 import os
+import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 from datetime import timedelta
@@ -54,7 +55,11 @@ from vllm.v1.outputs import (
     DraftTokenIds,
     ModelRunnerOutput,
 )
-from vllm.v1.utils import compute_iteration_details, report_usage_stats
+from vllm.v1.utils import (
+    compute_iteration_details,
+    heter_request_profile_record,
+    report_usage_stats,
+)
 from vllm.v1.worker.utils import is_residual_scattered_for_sp
 from vllm.v1.worker.worker_base import CompilationTimes, WorkerBase
 from vllm.v1.worker.workspace import init_workspace_manager
@@ -747,17 +752,30 @@ class Worker(WorkerBase):
     def sample_tokens(
         self, grammar_output: "GrammarOutput | None"
     ) -> ModelRunnerOutput | AsyncModelRunnerOutput:
-        return self.model_runner.sample_tokens(grammar_output)
+        profile_start = time.perf_counter()
+        output = self.model_runner.sample_tokens(grammar_output)
+        heter_request_profile_record(
+            "gpu_worker_sample_tokens_total",
+            time.perf_counter() - profile_start,
+        )
+        return output
 
     @torch.inference_mode()
     def execute_model(
         self, scheduler_output: "SchedulerOutput"
     ) -> ModelRunnerOutput | AsyncModelRunnerOutput | None:
+        profile_worker_start = time.perf_counter()
         # ensure any previous non-blocking PP sends are complete
+        profile_start = time.perf_counter()
         if self._pp_send_work:
             for handle in self._pp_send_work:
                 handle.wait()
             self._pp_send_work = []
+        heter_request_profile_record(
+            "gpu_worker_wait_pp_send",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+        )
 
         intermediate_tensors = None
         forward_pass = scheduler_output.total_num_scheduled_tokens > 0
@@ -810,8 +828,14 @@ class Worker(WorkerBase):
             )
 
         with self.annotate_profile(scheduler_output):
+            profile_start = time.perf_counter()
             output = self.model_runner.execute_model(
                 scheduler_output, intermediate_tensors
+            )
+            heter_request_profile_record(
+                "gpu_worker_model_runner_execute_model",
+                time.perf_counter() - profile_start,
+                scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
             )
             if (
                 self.use_v2_model_runner
@@ -822,6 +846,11 @@ class Worker(WorkerBase):
             if isinstance(
                 output, ModelRunnerOutput | AsyncModelRunnerOutput | NoneType
             ):
+                heter_request_profile_record(
+                    "gpu_worker_execute_model_total",
+                    time.perf_counter() - profile_worker_start,
+                    scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+                )
                 return output
 
         assert isinstance(output, IntermediateTensors)
@@ -838,6 +867,11 @@ class Worker(WorkerBase):
             all_gather_tensors=all_gather_tensors,
         )
 
+        heter_request_profile_record(
+            "gpu_worker_execute_model_total",
+            time.perf_counter() - profile_worker_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+        )
         return None
 
     def take_draft_token_ids(self) -> DraftTokenIds | None:

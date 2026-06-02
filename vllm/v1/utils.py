@@ -1,11 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 import argparse
+import atexit
 import contextlib
+import json
 import multiprocessing
+import os
 import threading
 import time
 import weakref
+from collections import defaultdict
 from collections.abc import Callable, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
@@ -41,6 +45,124 @@ if TYPE_CHECKING:
 logger = init_logger(__name__)
 
 T = TypeVar("T")
+
+
+def heter_request_profile_enabled() -> bool:
+    return os.environ.get("VLLM_HETER_REQUEST_PROFILE", "0") == "1"
+
+
+def heter_request_profile_mode() -> str:
+    return os.environ.get("VLLM_HETER_REQUEST_PROFILE_MODE", "memory").strip().lower()
+
+
+_HETER_REQUEST_PROFILE_LOCK = threading.Lock()
+_HETER_REQUEST_PROFILE_AGG: dict[str, dict[str, float | int]] = defaultdict(
+    lambda: {"count": 0, "total_s": 0.0, "max_s": 0.0}
+)
+_HETER_REQUEST_PROFILE_LAST_FLUSH = 0.0
+
+
+def _heter_request_profile_summary_path() -> str:
+    base = os.environ.get(
+        "VLLM_HETER_REQUEST_PROFILE_SUMMARY_PATH",
+        "/tmp/vllm_heter_request_profile_summary.json",
+    )
+    stem, suffix = os.path.splitext(base)
+    return f"{stem}.pid{os.getpid()}{suffix or '.json'}"
+
+
+def _heter_request_profile_aggregate_unlocked(event: str, elapsed_s: float) -> None:
+    item = _HETER_REQUEST_PROFILE_AGG[event]
+    item["count"] = int(item["count"]) + 1
+    item["total_s"] = float(item["total_s"]) + elapsed_s
+    item["max_s"] = max(float(item["max_s"]), elapsed_s)
+
+
+def heter_request_profile_flush_summary() -> None:
+    if not heter_request_profile_enabled():
+        return
+    if heter_request_profile_mode() != "memory":
+        return
+    try:
+        with _HETER_REQUEST_PROFILE_LOCK:
+            events = {
+                name: {
+                    "count": int(value["count"]),
+                    "total_s": float(value["total_s"]),
+                    "avg_ms": (
+                        float(value["total_s"]) / int(value["count"]) * 1000.0
+                        if int(value["count"]) > 0 else 0.0
+                    ),
+                    "max_ms": float(value["max_s"]) * 1000.0,
+                }
+                for name, value in _HETER_REQUEST_PROFILE_AGG.items()
+            }
+        path = _heter_request_profile_summary_path()
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        tmp_path = f"{path}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "pid": os.getpid(),
+                    "mode": heter_request_profile_mode(),
+                    "time": time.time(),
+                    "events": events,
+                },
+                f,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+        os.replace(tmp_path, path)
+    except Exception:
+        pass
+
+
+atexit.register(heter_request_profile_flush_summary)
+
+
+def heter_request_profile_record(
+    event: str,
+    elapsed_s: float,
+    **metadata: Any,
+) -> None:
+    if not heter_request_profile_enabled():
+        return
+    mode = heter_request_profile_mode()
+    if mode == "memory":
+        global _HETER_REQUEST_PROFILE_LAST_FLUSH
+        with _HETER_REQUEST_PROFILE_LOCK:
+            _heter_request_profile_aggregate_unlocked(event, elapsed_s)
+            now = time.monotonic()
+            flush_interval = float(
+                os.environ.get("VLLM_HETER_REQUEST_PROFILE_FLUSH_INTERVAL_S", "5.0")
+            )
+            should_flush = now - _HETER_REQUEST_PROFILE_LAST_FLUSH >= flush_interval
+            if should_flush:
+                _HETER_REQUEST_PROFILE_LAST_FLUSH = now
+        if should_flush:
+            heter_request_profile_flush_summary()
+        return
+    if mode != "jsonl":
+        return
+    path = os.environ.get(
+        "VLLM_HETER_REQUEST_PROFILE_PATH",
+        "/tmp/vllm_heter_request_profile_events.jsonl",
+    )
+    payload: dict[str, Any] = {
+        "event": event,
+        "elapsed_s": elapsed_s,
+        "pid": os.getpid(),
+        "time": time.time(),
+    }
+    if metadata:
+        payload.update(metadata)
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
+    except Exception:
+        pass
 
 
 class ConstantList(Generic[T], Sequence):

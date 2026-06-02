@@ -41,6 +41,7 @@ from vllm.sampling_params import BeamSearchParams, SamplingParams
 from vllm.tokenizers import TokenizerLike
 from vllm.utils.async_utils import merge_async_iterators
 from vllm.utils.collection_utils import as_list
+from vllm.v1.utils import heter_request_profile_record
 
 if TYPE_CHECKING:
     from vllm.entrypoints.serve.render.serving import OpenAIServingRender
@@ -118,12 +119,18 @@ class OpenAIServingCompletion(OpenAIServing):
             - suffix (the language models we currently support do not support
             suffix)
         """
+        profile_create_start = time.perf_counter()
         if request.stream and request.use_beam_search:
             return self.create_error_response(
                 "Streaming is not currently supported with beam search"
             )
 
+        profile_start = time.perf_counter()
         result = await self.render_completion_request(request)
+        heter_request_profile_record(
+            "openai_completion_render_request",
+            time.perf_counter() - profile_start,
+        )
         if isinstance(result, ErrorResponse):
             return result
 
@@ -224,8 +231,14 @@ class OpenAIServingCompletion(OpenAIServing):
         # Non-streaming response
         final_res_batch: list[RequestOutput | None] = [None] * num_prompts
         try:
+            profile_start = time.perf_counter()
             async for i, res in result_generator:
                 final_res_batch[i] = res
+            heter_request_profile_record(
+                "openai_completion_generate_iteration",
+                time.perf_counter() - profile_start,
+                num_prompts=num_prompts,
+            )
 
             for i, final_res in enumerate(final_res_batch):
                 assert final_res is not None
@@ -238,6 +251,7 @@ class OpenAIServingCompletion(OpenAIServing):
 
             final_res_batch_checked = cast(list[RequestOutput], final_res_batch)
 
+            profile_start = time.perf_counter()
             response = self.request_output_to_completion_response(
                 final_res_batch_checked,
                 request,
@@ -246,6 +260,11 @@ class OpenAIServingCompletion(OpenAIServing):
                 model_name,
                 tokenizer,
                 request_metadata,
+            )
+            heter_request_profile_record(
+                "openai_completion_build_response",
+                time.perf_counter() - profile_start,
+                num_prompts=num_prompts,
             )
         except asyncio.CancelledError:
             return self.create_error_response("Client disconnected")
@@ -261,6 +280,11 @@ class OpenAIServingCompletion(OpenAIServing):
 
             return fake_stream_generator()
 
+        heter_request_profile_record(
+            "openai_completion_create_total",
+            time.perf_counter() - profile_create_start,
+            num_prompts=num_prompts,
+        )
         return response
 
     async def completion_stream_generator(

@@ -1,0 +1,6 @@
+repeat,request_wall_s,completion_tokens_per_s,prompt_tokens,completion_tokens,total_tokens,server_start_attempt,server_log
+1,8.528715232969262,23.450190859563996,2001,200,2201,1,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/p2k_o200_anomaly_recheck/heter_p2000_o200_repeat1_attempt1_server.log
+2,8.559087531990372,23.366976824630164,2001,200,2201,1,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/p2k_o200_anomaly_recheck/heter_p2000_o200_repeat2_attempt1_server.log
+3,9.299927167012356,21.505544764846896,2001,200,2201,1,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/p2k_o200_anomaly_recheck/heter_p2000_o200_repeat3_attempt1_server.log
+4,8.863961513969116,22.563274861337224,2001,200,2201,1,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/p2k_o200_anomaly_recheck/heter_p2000_o200_repeat4_attempt1_server.log
+5,8.621575365017634,23.197616622538327,2001,200,2201,1,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/p2k_o200_anomaly_recheck/heter_p2000_o200_repeat5_attempt1_server.log

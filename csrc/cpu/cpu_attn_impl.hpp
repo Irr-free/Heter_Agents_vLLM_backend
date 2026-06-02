@@ -3,6 +3,7 @@
 
 #include <type_traits>
 #include <cstddef>
+#include <chrono>
 
 #if defined(__APPLE__)
   #include <sys/sysctl.h>
@@ -13,6 +14,98 @@
 
 namespace cpu_attention {
 enum class ISA { AMX, VEC, VEC16, NEON, VXE };
+
+struct AttentionInnerProfileData {
+  int64_t split_flag_reset_ns = 0;
+  int64_t split_flag_reset_calls = 0;
+  int64_t task_acquire_ns = 0;
+  int64_t task_acquire_calls = 0;
+  int64_t q_copy_ns = 0;
+  int64_t q_copy_calls = 0;
+  int64_t qk_gemm_ns = 0;
+  int64_t qk_gemm_calls = 0;
+  int64_t qk_block_lookup_ns = 0;
+  int64_t qk_block_lookup_calls = 0;
+  int64_t qk_tile_gemm_ns = 0;
+  int64_t qk_tile_gemm_calls = 0;
+  int64_t softcap_ns = 0;
+  int64_t softcap_calls = 0;
+  int64_t alibi_ns = 0;
+  int64_t alibi_calls = 0;
+  int64_t mask_ns = 0;
+  int64_t mask_calls = 0;
+  int64_t softmax_ns = 0;
+  int64_t softmax_calls = 0;
+  int64_t pv_gemm_ns = 0;
+  int64_t pv_gemm_calls = 0;
+  int64_t pv_block_lookup_ns = 0;
+  int64_t pv_block_lookup_calls = 0;
+  int64_t pv_tile_gemm_ns = 0;
+  int64_t pv_tile_gemm_calls = 0;
+  int64_t final_output_ns = 0;
+  int64_t final_output_calls = 0;
+  int64_t partial_output_ns = 0;
+  int64_t partial_output_calls = 0;
+  int64_t reduce_splits_ns = 0;
+  int64_t reduce_splits_calls = 0;
+  int64_t split_barrier_wait_ns = 0;
+  int64_t split_barrier_wait_calls = 0;
+  int64_t reduce_flag_wait_ns = 0;
+  int64_t reduce_flag_wait_calls = 0;
+
+  void merge(const AttentionInnerProfileData& other) {
+    split_flag_reset_ns += other.split_flag_reset_ns;
+    split_flag_reset_calls += other.split_flag_reset_calls;
+    task_acquire_ns += other.task_acquire_ns;
+    task_acquire_calls += other.task_acquire_calls;
+    q_copy_ns += other.q_copy_ns;
+    q_copy_calls += other.q_copy_calls;
+    qk_gemm_ns += other.qk_gemm_ns;
+    qk_gemm_calls += other.qk_gemm_calls;
+    qk_block_lookup_ns += other.qk_block_lookup_ns;
+    qk_block_lookup_calls += other.qk_block_lookup_calls;
+    qk_tile_gemm_ns += other.qk_tile_gemm_ns;
+    qk_tile_gemm_calls += other.qk_tile_gemm_calls;
+    softcap_ns += other.softcap_ns;
+    softcap_calls += other.softcap_calls;
+    alibi_ns += other.alibi_ns;
+    alibi_calls += other.alibi_calls;
+    mask_ns += other.mask_ns;
+    mask_calls += other.mask_calls;
+    softmax_ns += other.softmax_ns;
+    softmax_calls += other.softmax_calls;
+    pv_gemm_ns += other.pv_gemm_ns;
+    pv_gemm_calls += other.pv_gemm_calls;
+    pv_block_lookup_ns += other.pv_block_lookup_ns;
+    pv_block_lookup_calls += other.pv_block_lookup_calls;
+    pv_tile_gemm_ns += other.pv_tile_gemm_ns;
+    pv_tile_gemm_calls += other.pv_tile_gemm_calls;
+    final_output_ns += other.final_output_ns;
+    final_output_calls += other.final_output_calls;
+    partial_output_ns += other.partial_output_ns;
+    partial_output_calls += other.partial_output_calls;
+    reduce_splits_ns += other.reduce_splits_ns;
+    reduce_splits_calls += other.reduce_splits_calls;
+    split_barrier_wait_ns += other.split_barrier_wait_ns;
+    split_barrier_wait_calls += other.split_barrier_wait_calls;
+    reduce_flag_wait_ns += other.reduce_flag_wait_ns;
+    reduce_flag_wait_calls += other.reduce_flag_wait_calls;
+  }
+};
+
+FORCE_INLINE int64_t attention_profile_now_ns() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
+}
+
+#define CPU_ATTN_PROFILE_ADD(profile, field)                           \
+  do {                                                                 \
+    if ((profile) != nullptr) {                                        \
+      (profile)->field##_ns += attention_profile_now_ns() - profile_start; \
+      ++((profile)->field##_calls);                                    \
+    }                                                                  \
+  } while (0)
 
 template <ISA isa, typename scalar_t, int64_t head_dim>
 class AttentionImpl {};
@@ -780,6 +873,7 @@ struct AttentionInput {
   int32_t sliding_window_left;
   int32_t sliding_window_right;
   float softcap;
+  AttentionInnerProfileData* inner_profile;
 };
 
 #define DEFINE_CPU_ATTENTION_PARAMS                                         \
@@ -797,7 +891,8 @@ struct AttentionInput {
       const int32_t left_window_size, const int32_t right_window_size,      \
       float scale, const float softcap_scale,                               \
       const float *__restrict__ alibi_slopes, const bool is_first_iter,     \
-      const bool use_sink, const bool debug_info
+      const bool use_sink, const bool debug_info,                           \
+      AttentionInnerProfileData *__restrict__ inner_profile
 
 #define CPU_ATTENTION_PARAMS                                                  \
   q_heads_buffer, k_head_cache_ptr, v_head_cache_ptr, logits_buffer,          \
@@ -805,7 +900,8 @@ struct AttentionInput {
       kv_tile_start_pos, kv_tile_end_pos, kv_tile_token_num,                  \
       kv_cache_num_blocks_stride, q_head_num, q_token_num, q_tile_start_pos,  \
       q_heads_per_kv, block_size, left_window_size, right_window_size, scale, \
-      softcap_scale, alibi_slopes, is_first_iter, use_sink, debug_info
+      softcap_scale, alibi_slopes, is_first_iter, use_sink, debug_info,       \
+      inner_profile
 
 enum class AttentionGemmPhase { QK, PV };
 
@@ -929,6 +1025,8 @@ class AttentionMainLoop {
 
       // compute Q@K logits
       {
+        const int64_t profile_start =
+            inner_profile != nullptr ? attention_profile_now_ns() : 0;
         int32_t curr_group_offset =
             start_block_group_offset * k_cache_token_group_stride;
         int32_t curr_group_num_in_block =
@@ -937,11 +1035,18 @@ class AttentionMainLoop {
         logits_buffer_t* curr_logits_buffer = logits_buffer;
         for (int32_t block_idx = start_block_idx; block_idx < end_block_idx;
              ++block_idx) {
+          const int64_t lookup_profile_start =
+              inner_profile != nullptr ? attention_profile_now_ns() : 0;
           int32_t physical_block_idx = block_table[block_idx];
           kv_cache_t* k_cache_block_ptr =
               k_head_cache_ptr +
               physical_block_idx * kv_cache_num_blocks_stride +
               curr_group_offset;
+          if (inner_profile != nullptr) {
+            inner_profile->qk_block_lookup_ns +=
+                attention_profile_now_ns() - lookup_profile_start;
+            ++inner_profile->qk_block_lookup_calls;
+          }
           curr_group_num_in_block =
               std::min(remaining_group_num, curr_group_num_in_block);
 
@@ -953,10 +1058,17 @@ class AttentionMainLoop {
 
             // By default, logits_buffer, q_buffer and k_cache are row-major,
             // but may be packed by ISA implementation.
+            const int64_t tile_gemm_profile_start =
+                inner_profile != nullptr ? attention_profile_now_ns() : 0;
             tile_gemm_t::template gemm<AttentionGemmPhase::QK, head_dim>(
                 q_head_num, q_heads_buffer, k_cache_block_ptr,
                 curr_logits_buffer, head_dim, block_size, kv_tile_token_num,
                 block_size, head_dim, false);
+            if (inner_profile != nullptr) {
+              inner_profile->qk_tile_gemm_ns +=
+                  attention_profile_now_ns() - tile_gemm_profile_start;
+              ++inner_profile->qk_tile_gemm_calls;
+            }
 
             if constexpr (scale_on_logits) {
               float* __restrict__ scale_curr_logits_buffer = curr_logits_buffer;
@@ -984,6 +1096,7 @@ class AttentionMainLoop {
           curr_group_offset = 0;
           curr_group_num_in_block = token_group_num_per_block;
         }
+        CPU_ATTN_PROFILE_ADD(inner_profile, qk_gemm);
       }
 
       // process logits
@@ -994,24 +1107,35 @@ class AttentionMainLoop {
         // }
 
         if (softcap_scale != 0.0f) {
+          const int64_t profile_start =
+              inner_profile != nullptr ? attention_profile_now_ns() : 0;
           apply_softcap(logits_buffer, kv_tile_token_num, q_head_num,
                         kv_tile_token_num, softcap_scale);
+          CPU_ATTN_PROFILE_ADD(inner_profile, softcap);
           // print_logits("softcap raw logits", logits_buffer, q_head_num,
           // kv_tile_token_num, kv_tile_token_num);
         }
 
         if (alibi_slopes != nullptr) {
+          const int64_t profile_start =
+              inner_profile != nullptr ? attention_profile_now_ns() : 0;
           apply_alibi_slopes(logits_buffer, alibi_slopes, kv_tile_token_num,
                              q_tile_start_pos, kv_tile_start_pos, q_token_num,
                              kv_tile_token_num, q_heads_per_kv);
+          CPU_ATTN_PROFILE_ADD(inner_profile, alibi);
 
           // print_logits("alibi raw logits", logits_buffer, q_head_num,
           // kv_tile_token_num, kv_tile_token_num);
         }
 
-        apply_mask(logits_buffer, kv_tile_token_num, q_tile_start_pos,
-                   kv_tile_start_pos, kv_tile_end_pos, q_token_num,
-                   q_heads_per_kv, left_window_size, right_window_size);
+        {
+          const int64_t profile_start =
+              inner_profile != nullptr ? attention_profile_now_ns() : 0;
+          apply_mask(logits_buffer, kv_tile_token_num, q_tile_start_pos,
+                     kv_tile_start_pos, kv_tile_end_pos, q_token_num,
+                     q_heads_per_kv, left_window_size, right_window_size);
+          CPU_ATTN_PROFILE_ADD(inner_profile, mask);
+        }
 
         // if (debug_info){
         // print_logits("masked logits", logits_buffer, q_head_num,
@@ -1020,9 +1144,14 @@ class AttentionMainLoop {
         // print_logits("old_sum", sum_buffer, 1, q_head_num, q_head_num);
         // }
 
-        apply_softmax(logits_buffer, partial_q_buffer, max_buffer, sum_buffer,
-                      kv_tile_token_num, q_head_num, kv_tile_token_num,
-                      is_first_iter, use_sink);
+        {
+          const int64_t profile_start =
+              inner_profile != nullptr ? attention_profile_now_ns() : 0;
+          apply_softmax(logits_buffer, partial_q_buffer, max_buffer, sum_buffer,
+                        kv_tile_token_num, q_head_num, kv_tile_token_num,
+                        is_first_iter, use_sink);
+          CPU_ATTN_PROFILE_ADD(inner_profile, softmax);
+        }
 
         // if (debug_info){
         //     print_logits("softmax logits",
@@ -1036,6 +1165,8 @@ class AttentionMainLoop {
 
       // compute P@V
       {
+        const int64_t profile_start =
+            inner_profile != nullptr ? attention_profile_now_ns() : 0;
         int32_t curr_group_offset =
             start_block_group_offset * v_cache_token_group_stride;
         int32_t curr_group_num_in_block =
@@ -1051,11 +1182,18 @@ class AttentionMainLoop {
         bool accum_c = !is_first_iter;
         for (int32_t block_idx = start_block_idx; block_idx < end_block_idx;
              ++block_idx) {
+          const int64_t lookup_profile_start =
+              inner_profile != nullptr ? attention_profile_now_ns() : 0;
           int32_t physical_block_idx = block_table[block_idx];
           kv_cache_t* v_cache_block_ptr =
               v_head_cache_ptr +
               physical_block_idx * kv_cache_num_blocks_stride +
               curr_group_offset;
+          if (inner_profile != nullptr) {
+            inner_profile->pv_block_lookup_ns +=
+                attention_profile_now_ns() - lookup_profile_start;
+            ++inner_profile->pv_block_lookup_calls;
+          }
           curr_group_num_in_block =
               std::min(remaining_group_num, curr_group_num_in_block);
           int32_t curr_token_num =
@@ -1066,10 +1204,17 @@ class AttentionMainLoop {
             // output_tile = p_tile @ v_tile, [MaxQHeadNumPerIteration,
             // HeadDimAlignment] = [MaxQHeadNumPerIteration, block_size] @
             // [block_size, HeadDimAlignment]
+            const int64_t tile_gemm_profile_start =
+                inner_profile != nullptr ? attention_profile_now_ns() : 0;
             tile_gemm_t::template gemm<AttentionGemmPhase::PV, -1>(
                 q_head_num, curr_prob_buffer, v_cache_block_ptr,
                 curr_partial_q_buffer, prob_buffer_stride, head_dim, head_dim,
                 block_size, curr_token_num, accum_c);
+            if (inner_profile != nullptr) {
+              inner_profile->pv_tile_gemm_ns +=
+                  attention_profile_now_ns() - tile_gemm_profile_start;
+              ++inner_profile->pv_tile_gemm_calls;
+            }
 
             // Update
             curr_partial_q_buffer += headdim_alignment;
@@ -1084,6 +1229,7 @@ class AttentionMainLoop {
           curr_partial_q_buffer = partial_q_buffer;
           accum_c = true;
         }
+        CPU_ATTN_PROFILE_ADD(inner_profile, pv_gemm);
       }
       //   if (debug_info) {
       //     print_logits("output", partial_q_buffer, q_head_num, head_dim,
@@ -1368,6 +1514,9 @@ class AttentionMainLoop {
 
 #pragma omp parallel for schedule(static, 1)
     for (int thread_id = 0; thread_id < thread_num; ++thread_id) {
+      AttentionInnerProfileData thread_profile;
+      AttentionInnerProfileData* thread_profile_ptr =
+          input->inner_profile != nullptr ? &thread_profile : nullptr;
       AttentionMetadata& metadata = *input->metadata;
       if (metadata.workitem_group_num == 0) {
         continue;
@@ -1411,6 +1560,8 @@ class AttentionMainLoop {
       const int32_t total_reduction_split_num = metadata.reduction_split_num;
       if (metadata.reduction_split_num > 0) {
         // reset split flag
+        const int64_t profile_start =
+            thread_profile_ptr != nullptr ? attention_profile_now_ns() : 0;
         for (int32_t head_idx = thread_id; head_idx < actual_kv_head_num;
              head_idx += thread_num) {
           buffer_manager.update(head_idx, total_reduction_split_num, head_dim,
@@ -1422,6 +1573,7 @@ class AttentionMainLoop {
             curr_flag_ptr[split_idx] = false;
           }
         }
+        CPU_ATTN_PROFILE_ADD(thread_profile_ptr, split_flag_reset);
       }
 
       const int64_t available_cache_size = cpu_utils::get_available_l2_size();
@@ -1454,6 +1606,8 @@ class AttentionMainLoop {
 
       if (metadata.reduction_split_num > 0) {
         ++(*guard_counter_ptr);
+        const int64_t profile_start =
+            thread_profile_ptr != nullptr ? attention_profile_now_ns() : 0;
         while (guard_counter_ptr->load() != thread_num) {
 #ifdef FAST_SPINNING
           FAST_SPINNING
@@ -1461,11 +1615,19 @@ class AttentionMainLoop {
           std::this_thread::yield();
 #endif
         }
+        CPU_ATTN_PROFILE_ADD(thread_profile_ptr, split_barrier_wait);
       }
 
       // main loop
       for (;;) {
+        const int64_t task_profile_start =
+            thread_profile_ptr != nullptr ? attention_profile_now_ns() : 0;
         int64_t task_idx = metadata.acquire_counter();
+        if (thread_profile_ptr != nullptr) {
+          thread_profile_ptr->task_acquire_ns +=
+              attention_profile_now_ns() - task_profile_start;
+          ++thread_profile_ptr->task_acquire_calls;
+        }
 
         if (task_idx >= total_counter_num) {
           // no more tasks, leave loop
@@ -1601,10 +1763,14 @@ class AttentionMainLoop {
               // copy the Q tile to q_buffer, the logical layout of q_buffer is
               // [actual_q_token_num, actual_q_heads_per_kv, head_dim]
               {
+                const int64_t profile_start =
+                    thread_profile_ptr != nullptr ? attention_profile_now_ns()
+                                                  : 0;
                 attn_impl.copy_q_heads_tile(
                     q_tile_ptr, q_buffer, actual_q_token_num,
                     actual_q_heads_per_kv, q_token_num_stride,
                     q_head_num_stride, scale);
+                CPU_ATTN_PROFILE_ADD(thread_profile_ptr, q_copy);
               }
 
               if (use_sink) {
@@ -1741,7 +1907,8 @@ class AttentionMainLoop {
                       q_tile_token_num, q_tile_pos_left, actual_q_heads_per_kv,
                       block_size, sliding_window_left, sliding_window_right,
                       scale, softcap_scale, curr_alibi_slopes,
-                      first_iter_flag[q_iter_idx], use_sink, debug_info);
+                      first_iter_flag[q_iter_idx], use_sink, debug_info,
+                      thread_profile_ptr);
                   first_iter_flag[q_iter_idx] = false;
                 }
               }
@@ -1749,11 +1916,15 @@ class AttentionMainLoop {
               // write back partial results to output buffer or reduction buffer
               {
                 if (curr_spilt_id == -1) {
+                  const int64_t profile_start =
+                      thread_profile_ptr != nullptr ? attention_profile_now_ns()
+                                                    : 0;
                   final_output(partial_q_buffer,
                                reinterpret_cast<query_t*>(input->output) +
                                    output_buffer_offset,
                                sum_buffer, actual_q_heads_per_kv,
                                actual_q_token_num, q_head_num);
+                  CPU_ATTN_PROFILE_ADD(thread_profile_ptr, final_output);
                 } else {
                   const int32_t stride =
                       actual_q_heads_per_kv * split_kv_q_token_num_threshold;
@@ -1771,10 +1942,14 @@ class AttentionMainLoop {
                       buffer_manager.get_reduce_sum_buffer() +
                       curr_spilt_id * stride;
 
+                  const int64_t profile_start =
+                      thread_profile_ptr != nullptr ? attention_profile_now_ns()
+                                                    : 0;
                   partial_output(partial_q_buffer, max_buffer, sum_buffer,
                                  q_head_tile_size, split_output_buffer,
                                  split_max_buffer, split_sum_buffer,
                                  split_flag_buffer);
+                  CPU_ATTN_PROFILE_ADD(thread_profile_ptr, partial_output);
                 }
               }
             }
@@ -1816,15 +1991,25 @@ class AttentionMainLoop {
           float* split_sum_buffer =
               buffer_manager.get_reduce_sum_buffer() + curr_split_id * stride;
 
+          int64_t profile_start =
+              thread_profile_ptr != nullptr ? attention_profile_now_ns() : 0;
           reduce_splits(split_output_buffer, split_max_buffer, split_sum_buffer,
                         split_flag_buffer, stride, curr_output_head_num,
-                        curr_split_num);
+                        curr_split_num, thread_profile_ptr);
+          CPU_ATTN_PROFILE_ADD(thread_profile_ptr, reduce_splits);
+          profile_start =
+              thread_profile_ptr != nullptr ? attention_profile_now_ns() : 0;
           final_output(
               split_output_buffer,
               reinterpret_cast<query_t*>(input->output) + output_buffer_offset,
               split_sum_buffer, actual_q_heads_per_kv, curr_output_token_num,
               q_head_num);
+          CPU_ATTN_PROFILE_ADD(thread_profile_ptr, final_output);
         }
+      }
+      if (input->inner_profile != nullptr) {
+#pragma omp critical(cpu_attention_inner_profile_merge)
+        { input->inner_profile->merge(thread_profile); }
       }
     }
     // Reset counter for next call
@@ -1836,7 +2021,8 @@ class AttentionMainLoop {
                      float* __restrict__ split_sum_buffer,
                      volatile bool* __restrict__ flags,
                      const int32_t head_num_per_split,
-                     const int32_t curr_head_num, const int32_t split_num) {
+                     const int32_t curr_head_num, const int32_t split_num,
+                     AttentionInnerProfileData* __restrict__ inner_profile) {
 #ifdef DEFINE_FAST_EXP
     DEFINE_FAST_EXP
 #endif
@@ -1851,12 +2037,19 @@ class AttentionMainLoop {
     float* __restrict__ curr_split_sum_buffer = split_sum_buffer;
     constexpr int32_t head_dim_group_num = head_dim / 16;
     for (int32_t split_idx = 0; split_idx < split_num; ++split_idx) {
+      const int64_t flag_wait_profile_start =
+          inner_profile != nullptr ? attention_profile_now_ns() : 0;
       while (!flags[split_idx]) {
 #ifdef FAST_SPINNING
         FAST_SPINNING
 #else
         std::this_thread::yield();
 #endif
+      }
+      if (inner_profile != nullptr) {
+        inner_profile->reduce_flag_wait_ns +=
+            attention_profile_now_ns() - flag_wait_profile_start;
+        ++inner_profile->reduce_flag_wait_calls;
       }
       std::atomic_thread_fence(std::memory_order_acquire);
 

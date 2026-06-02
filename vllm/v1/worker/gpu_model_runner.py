@@ -4,6 +4,7 @@
 import functools
 import gc
 import itertools
+import os
 import threading
 import time
 from collections import defaultdict
@@ -180,7 +181,11 @@ from vllm.v1.spec_decode.ngram_proposer_gpu import (
 from vllm.v1.spec_decode.suffix_decoding import SuffixDecodingProposer
 from vllm.v1.spec_decode.utils import update_num_computed_tokens_for_batch_change
 from vllm.v1.structured_output.utils import apply_grammar_bitmask
-from vllm.v1.utils import CpuGpuBuffer, record_function_or_nullcontext
+from vllm.v1.utils import (
+    CpuGpuBuffer,
+    heter_request_profile_record,
+    record_function_or_nullcontext,
+)
 from vllm.v1.worker import mamba_utils
 from vllm.v1.worker.cp_utils import (
     check_attention_cp_compatibility,
@@ -3789,6 +3794,7 @@ class GPUModelRunner(
         scheduler_output: "SchedulerOutput",
         intermediate_tensors: IntermediateTensors | None = None,
     ) -> ModelRunnerOutput | AsyncModelRunnerOutput | IntermediateTensors | None:
+        profile_execute_start = time.perf_counter()
         if self.execute_model_state is not None:
             raise RuntimeError(
                 "State error: sample_tokens() must be called "
@@ -3825,6 +3831,7 @@ class GPUModelRunner(
             get_kv_transfer_group().handle_preemptions(kv_connector_metadata)
 
         num_scheduled_tokens = scheduler_output.total_num_scheduled_tokens
+        profile_preprocess_start = time.perf_counter()
         with (
             record_function_or_nullcontext("gpu_model_runner: preprocess"),
             self.synchronize_input_prep(),
@@ -3902,25 +3909,52 @@ class GPUModelRunner(
                 num_encoder_reqs=len(scheduler_output.scheduled_encoder_inputs),
             )
 
-            # 异构系统：Pure Decode Batch 强制降级为 EAGER 模式
-            # CPU Attention 无法被 CUDA Graph 捕获
-            # 调试：记录 num_scheduled_tokens_np 的值
-            try:
-                with open("/tmp/vllm_execute_model_debug.log", "a") as f:
-                    f.write(f"cudagraph_mode={cudagraph_mode}, num_scheduled={num_scheduled_tokens_np.tolist()}, all_one={np.all(num_scheduled_tokens_np == 1)}\n")
-            except Exception:
-                pass
-            if cudagraph_mode != CUDAGraphMode.NONE:
+            # 异构系统：Pure Decode Batch 强制降级为 EAGER 模式。
+            # CPU Attention 无法被 CUDA Graph 捕获；但纯 GPU baseline
+            # 禁用 CPU attention 时应保留原生 CUDA Graph 路径。
+            heter_force_decode_eager = (
+                os.environ.get("VLLM_HETER_DISABLE_CPU_ATTENTION", "0") != "1"
+                or os.environ.get("VLLM_HETER_FORCE_DECODE_EAGER", "0") == "1"
+            )
+            heter_debug_cudagraph = (
+                os.environ.get("VLLM_HETER_CUDAGRAPH_DEBUG", "0") == "1"
+            )
+            if heter_debug_cudagraph:
+                profile_debug_start = time.perf_counter()
+                try:
+                    with open("/tmp/vllm_execute_model_debug.log", "a") as f:
+                        f.write(
+                            f"cudagraph_mode={cudagraph_mode}, "
+                            f"num_scheduled={num_scheduled_tokens_np.tolist()}, "
+                            f"all_one={np.all(num_scheduled_tokens_np == 1)}\n"
+                        )
+                except Exception:
+                    pass
+                heter_request_profile_record(
+                    "gpu_model_runner_debug_log_write",
+                    time.perf_counter() - profile_debug_start,
+                    scheduled_tokens=int(num_scheduled_tokens),
+                    max_scheduled_tokens=int(max_num_scheduled_tokens),
+                )
+            if heter_force_decode_eager and cudagraph_mode != CUDAGraphMode.NONE:
                 # num_scheduled_tokens_np 中所有值均为 1 表示 pure decode
                 if np.all(num_scheduled_tokens_np == 1):
                     cudagraph_mode = CUDAGraphMode.NONE
                     from dataclasses import replace as dc_replace
                     batch_desc = dc_replace(batch_desc, num_tokens=batch_desc.num_tokens)
-                    try:
-                        with open("/tmp/vllm_execute_model_debug.log", "a") as f:
-                            f.write("  -> 降级为 EAGER\n")
-                    except Exception:
-                        pass
+                    if heter_debug_cudagraph:
+                        profile_debug_start = time.perf_counter()
+                        try:
+                            with open("/tmp/vllm_execute_model_debug.log", "a") as f:
+                                f.write("  -> 降级为 EAGER\n")
+                        except Exception:
+                            pass
+                        heter_request_profile_record(
+                            "gpu_model_runner_debug_log_write",
+                            time.perf_counter() - profile_debug_start,
+                            scheduled_tokens=int(num_scheduled_tokens),
+                            max_scheduled_tokens=int(max_num_scheduled_tokens),
+                        )
 
             logger.debug(
                 "Running batch with cudagraph_mode: %s, batch_descriptor: %s, "
@@ -4029,6 +4063,11 @@ class GPUModelRunner(
             ) = self._preprocess(
                 scheduler_output, num_tokens_padded, intermediate_tensors
             )
+        heter_request_profile_record(
+            "gpu_model_runner_preprocess_total",
+            time.perf_counter() - profile_preprocess_start,
+            scheduled_tokens=int(num_scheduled_tokens),
+        )
 
         # Set cudagraph mode to none if calc_kv_scales is true.
         # KV scales calculation involves dynamic operations that are incompatible
@@ -4068,6 +4107,7 @@ class GPUModelRunner(
                 defer_finalize=defer_kv_connector_finalize,
             ) as kv_connector_output,
         ):
+            profile_forward_start = time.perf_counter()
             model_output = self._model_forward(
                 input_ids=input_ids,
                 positions=positions,
@@ -4075,7 +4115,13 @@ class GPUModelRunner(
                 inputs_embeds=inputs_embeds,
                 **model_kwargs,
             )
+            heter_request_profile_record(
+                "gpu_model_runner_model_forward",
+                time.perf_counter() - profile_forward_start,
+                scheduled_tokens=int(num_scheduled_tokens),
+            )
 
+        profile_postprocess_start = time.perf_counter()
         with record_function_or_nullcontext("gpu_model_runner: postprocess"):
             if self.use_aux_hidden_state_outputs:
                 # True when EAGLE 3 is used.
@@ -4148,18 +4194,35 @@ class GPUModelRunner(
             slot_mappings,
         )
         self.kv_connector_output = kv_connector_output
+        heter_request_profile_record(
+            "gpu_model_runner_postprocess_total",
+            time.perf_counter() - profile_postprocess_start,
+            scheduled_tokens=int(num_scheduled_tokens),
+        )
 
         # Now the batch has been launched we can wait for corrections from the
         # previous model forward without breaking async scheduling.
+        profile_deferred_start = time.perf_counter()
         if deferred_state_corrections_fn:
             deferred_state_corrections_fn()
+        heter_request_profile_record(
+            "gpu_model_runner_deferred_state_corrections",
+            time.perf_counter() - profile_deferred_start,
+            scheduled_tokens=int(num_scheduled_tokens),
+        )
 
+        heter_request_profile_record(
+            "gpu_model_runner_execute_model_total",
+            time.perf_counter() - profile_execute_start,
+            scheduled_tokens=int(num_scheduled_tokens),
+        )
         return None
 
     @torch.inference_mode
     def sample_tokens(
         self, grammar_output: "GrammarOutput | None"
     ) -> ModelRunnerOutput | AsyncModelRunnerOutput | IntermediateTensors:
+        profile_sample_total_start = time.perf_counter()
         if self.execute_model_state is None:
             kv_connector_output = self.kv_connector_output
             self.kv_connector_output = None
@@ -4176,6 +4239,10 @@ class GPUModelRunner(
 
             output = copy(EMPTY_MODEL_RUNNER_OUTPUT)
             output.kv_connector_output = kv_connector_output
+            heter_request_profile_record(
+                "gpu_model_runner_sample_tokens_total",
+                time.perf_counter() - profile_sample_total_start,
+            )
             return output
 
         # Unpack ephemeral state.
@@ -4195,16 +4262,34 @@ class GPUModelRunner(
         self.execute_model_state = None
 
         # Apply structured output bitmasks if present.
+        profile_start = time.perf_counter()
         if grammar_output is not None:
             apply_grammar_bitmask(
                 scheduler_output, grammar_output, self.input_batch, logits
             )
+        heter_request_profile_record(
+            "gpu_model_runner_apply_grammar_bitmask",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+        )
 
+        profile_start = time.perf_counter()
         with record_function_or_nullcontext("gpu_model_runner: sample"):
             sampler_output = self._sample(logits, spec_decode_metadata)
+        heter_request_profile_record(
+            "gpu_model_runner_sample_kernel_total",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+        )
 
+        profile_start = time.perf_counter()
         self._update_states_after_model_execute(
             sampler_output.sampled_token_ids, scheduler_output
+        )
+        heter_request_profile_record(
+            "gpu_model_runner_update_states_after_execute",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
         )
         if self.use_async_scheduling:
             pp = get_pp_group()
@@ -4312,6 +4397,7 @@ class GPUModelRunner(
                 ).expand(len(self.input_batch.req_ids), self.num_spec_tokens)
                 self._copy_draft_token_ids_to_cpu(scheduler_output, zeros_only=True)
 
+        profile_bookkeep_start = time.perf_counter()
         with record_function_or_nullcontext("gpu_model_runner: bookkeep"):
             (
                 num_nans_in_logits,
@@ -4328,6 +4414,11 @@ class GPUModelRunner(
                 hidden_states,
                 scheduler_output.total_num_scheduled_tokens,
             )
+        heter_request_profile_record(
+            "gpu_model_runner_bookkeeping_sync",
+            time.perf_counter() - profile_bookkeep_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+        )
 
         if propose_drafts_after_bookkeeping:
             # ngram and other speculative decoding methods use the sampled
@@ -4337,16 +4428,29 @@ class GPUModelRunner(
         # Finalize KV connector (wait_for_save + clear metadata) after
         # draft model runs. Deferred from target model forward to allow
         # draft model to also save its KV cache.
+        profile_start = time.perf_counter()
         if spec_config is not None:
             self.finalize_kv_connector()
+        heter_request_profile_record(
+            "gpu_model_runner_finalize_kv_connector",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+        )
 
+        profile_start = time.perf_counter()
         with record_function_or_nullcontext("gpu_model_runner: eplb"):
             self.eplb_step()
+        heter_request_profile_record(
+            "gpu_model_runner_eplb_step",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+        )
 
         # self.kv_connector_output may be modified during drafting
         kv_connector_output = self.kv_connector_output
         self.kv_connector_output = None
 
+        profile_start = time.perf_counter()
         with record_function_or_nullcontext("gpu_model_runner: ModelRunnerOutput"):
             if self.routed_experts_initialized:
                 capturer = RoutedExpertsCapturer.get_instance()
@@ -4368,10 +4472,21 @@ class GPUModelRunner(
                 num_nans_in_logits=num_nans_in_logits,
                 cudagraph_stats=cudagraph_stats,
             )
+        heter_request_profile_record(
+            "gpu_model_runner_build_output",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+        )
 
         if not self.use_async_scheduling:
+            heter_request_profile_record(
+                "gpu_model_runner_sample_tokens_total",
+                time.perf_counter() - profile_sample_total_start,
+                scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+            )
             return output
 
+        profile_start = time.perf_counter()
         with record_function_or_nullcontext(
             "gpu_model_runner: AsyncGPUModelRunnerOutput"
         ):
@@ -4383,6 +4498,12 @@ class GPUModelRunner(
                 async_output_copy_stream=self._get_or_create_async_output_copy_stream(),
                 vocab_size=self.input_batch.vocab_size,
             )
+        heter_request_profile_record(
+            "gpu_model_runner_build_async_output",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+        )
+        profile_start = time.perf_counter()
         with record_function_or_nullcontext(
             "gpu_model_runner: set_async_sampled_token_ids"
         ):
@@ -4392,7 +4513,17 @@ class GPUModelRunner(
                 async_output.sampled_token_ids_cpu,
                 async_output.async_copy_ready_event,
             )
+        heter_request_profile_record(
+            "gpu_model_runner_set_async_sampled_token_ids",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+        )
 
+        heter_request_profile_record(
+            "gpu_model_runner_sample_tokens_total",
+            time.perf_counter() - profile_sample_total_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+        )
         return async_output
 
     def _pp_broadcast_prev_sampled_token_ids(

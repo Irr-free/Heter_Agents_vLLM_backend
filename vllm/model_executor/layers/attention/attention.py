@@ -1,8 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
+import atexit
+from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
+import threading
 from typing import TYPE_CHECKING, Any
 import json
 import os
@@ -65,6 +68,76 @@ def _heter_profile_enabled() -> bool:
     return os.environ.get("VLLM_HETER_PROFILE", "0") == "1"
 
 
+def _heter_profile_mode() -> str:
+    return os.environ.get("VLLM_HETER_PROFILE_MODE", "jsonl").strip().lower()
+
+
+def _heter_profile_fine_enabled() -> bool:
+    return _heter_profile_enabled() and _heter_profile_mode() == "fine"
+
+
+_HETER_PROFILE_AGG_LOCK = threading.Lock()
+_HETER_PROFILE_AGG: dict[str, dict[str, float | int]] = defaultdict(
+    lambda: {"count": 0, "total_s": 0.0, "max_s": 0.0}
+)
+_HETER_PROFILE_AGG_LAST_FLUSH = 0.0
+
+
+def _heter_profile_summary_path() -> Path:
+    base = Path(
+        os.environ.get(
+            "VLLM_HETER_PROFILE_SUMMARY_PATH",
+            "/tmp/vllm_heter_profile_summary.json",
+        )
+    )
+    return base.with_name(f"{base.stem}.pid{os.getpid()}{base.suffix}")
+
+
+def _heter_profile_aggregate_unlocked(event: str, elapsed_s: float) -> None:
+    item = _HETER_PROFILE_AGG[event]
+    item["count"] = int(item["count"]) + 1
+    item["total_s"] = float(item["total_s"]) + elapsed_s
+    item["max_s"] = max(float(item["max_s"]), elapsed_s)
+
+
+def _heter_profile_flush_summary() -> None:
+    if not _heter_profile_enabled():
+        return
+    if _heter_profile_mode() not in ("memory", "outer_only", "fine"):
+        return
+    try:
+        with _HETER_PROFILE_AGG_LOCK:
+            events = {
+                name: {
+                    "count": int(value["count"]),
+                    "total_s": float(value["total_s"]),
+                    "avg_ms": (
+                        float(value["total_s"]) / int(value["count"]) * 1000.0
+                        if int(value["count"]) > 0 else 0.0
+                    ),
+                    "max_ms": float(value["max_s"]) * 1000.0,
+                }
+                for name, value in _HETER_PROFILE_AGG.items()
+            }
+        path = _heter_profile_summary_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        payload = {
+            "pid": os.getpid(),
+            "mode": _heter_profile_mode(),
+            "time": time.time(),
+            "events": events,
+        }
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=True)
+        os.replace(tmp_path, path)
+    except Exception:
+        pass
+
+
+atexit.register(_heter_profile_flush_summary)
+
+
 def _heter_profile_record(
     event: str,
     elapsed_s: float,
@@ -72,6 +145,29 @@ def _heter_profile_record(
     **fields: Any,
 ) -> None:
     if not _heter_profile_enabled():
+        return
+    mode = _heter_profile_mode()
+    if mode == "outer_only" and event != "decode_cpu_path_layer_total":
+        return
+    record_start = time.perf_counter()
+    if mode in ("memory", "outer_only", "fine"):
+        global _HETER_PROFILE_AGG_LAST_FLUSH
+        with _HETER_PROFILE_AGG_LOCK:
+            _heter_profile_aggregate_unlocked(event, elapsed_s)
+            if mode == "fine":
+                _heter_profile_aggregate_unlocked(
+                    "profile_record_self_time",
+                    time.perf_counter() - record_start,
+                )
+            now = time.monotonic()
+            flush_interval = float(os.environ.get(
+                "VLLM_HETER_PROFILE_FLUSH_INTERVAL_S", "5.0"
+            ))
+            should_flush = now - _HETER_PROFILE_AGG_LAST_FLUSH >= flush_interval
+            if should_flush:
+                _HETER_PROFILE_AGG_LAST_FLUSH = now
+        if should_flush:
+            _heter_profile_flush_summary()
         return
     path = os.environ.get(
         "VLLM_HETER_PROFILE_PATH",
@@ -1076,20 +1172,64 @@ class Attention(nn.Module, AttentionLayerBase):
     def _build_cpu_metadata(self, attn_metadata) -> dict:
         """将 GPU attn_metadata 中的关键 tensor 搬到 CPU，供 CPU Attention kernel 使用。"""
         profile_start = time.perf_counter() if _heter_profile_enabled() else None
+        profile_fine = _heter_profile_fine_enabled()
+        fine_start = time.perf_counter() if profile_fine else None
         query_start_loc = attn_metadata.query_start_loc.cpu().to(torch.int32)
+        if fine_start is not None:
+            _heter_profile_record(
+                "metadata_query_start_loc_cpu_to_i32",
+                time.perf_counter() - fine_start,
+                self.layer_name,
+            )
+            fine_start = time.perf_counter()
         seq_lens = attn_metadata.seq_lens.cpu().to(torch.int32)
+        if fine_start is not None:
+            _heter_profile_record(
+                "metadata_seq_lens_cpu_to_i32",
+                time.perf_counter() - fine_start,
+                self.layer_name,
+            )
+            fine_start = time.perf_counter()
         block_table = attn_metadata.block_table.cpu().to(torch.int32)
+        if fine_start is not None:
+            _heter_profile_record(
+                "metadata_block_table_cpu_to_i32",
+                time.perf_counter() - fine_start,
+                self.layer_name,
+            )
+            fine_start = time.perf_counter()
         cpu_meta = {
             'query_start_loc': query_start_loc,
             'seq_lens': seq_lens,
             'block_table': block_table,
             'causal': attn_metadata.causal,
         }
+        if fine_start is not None:
+            _heter_profile_record(
+                "metadata_base_dict_package",
+                time.perf_counter() - fine_start,
+                self.layer_name,
+            )
+            fine_start = time.perf_counter()
         if hasattr(attn_metadata, 'alibi_slopes') and attn_metadata.alibi_slopes is not None:
             cpu_meta['alibi_slopes'] = attn_metadata.alibi_slopes.cpu()
         else:
             cpu_meta['alibi_slopes'] = None
+        if fine_start is not None:
+            _heter_profile_record(
+                "metadata_alibi_package",
+                time.perf_counter() - fine_start,
+                self.layer_name,
+            )
+            fine_start = time.perf_counter()
         cpu_attn_ops = _heter_cpu_attn_ops()
+        if fine_start is not None:
+            _heter_profile_record(
+                "metadata_ops_lookup",
+                time.perf_counter() - fine_start,
+                self.layer_name,
+            )
+            fine_start = time.perf_counter()
         if cpu_attn_ops is not None:
             get_scheduler_metadata = getattr(
                 cpu_attn_ops,
@@ -1097,6 +1237,13 @@ class Attention(nn.Module, AttentionLayerBase):
                 getattr(cpu_attn_ops, "get_scheduler_metadata", None),
             )
             assert get_scheduler_metadata is not None
+            if fine_start is not None:
+                _heter_profile_record(
+                    "metadata_get_scheduler_attr",
+                    time.perf_counter() - fine_start,
+                    self.layer_name,
+                )
+                fine_start = time.perf_counter()
             profile_scheduler_start = (
                 time.perf_counter() if _heter_profile_enabled() else None
             )
@@ -1111,6 +1258,12 @@ class Attention(nn.Module, AttentionLayerBase):
                 int(self.cpu_kv_cache.shape[3]) if self.cpu_kv_cache is not None else 32,
                 self.head_size,
             )
+            if fine_start is not None:
+                _heter_profile_record(
+                    "metadata_scheduler_arg_prepare",
+                    time.perf_counter() - fine_start,
+                    self.layer_name,
+                )
             cpu_meta['scheduler_metadata'] = (
                 get_scheduler_metadata(
                     int(query_start_loc.numel() - 1),
@@ -1123,7 +1276,7 @@ class Attention(nn.Module, AttentionLayerBase):
                     bool(attn_metadata.causal),
                     int(sliding_window_size),
                     isa,
-                    False,
+                    True,
                 )
             )
             if profile_scheduler_start is not None:
@@ -1151,16 +1304,46 @@ class Attention(nn.Module, AttentionLayerBase):
     ) -> None:
         """调用 vLLM CPU 版本的 Paged Attention Kernel。"""
         profile_start = time.perf_counter() if _heter_profile_enabled() else None
+        profile_fine = _heter_profile_fine_enabled()
+        fine_start = time.perf_counter() if profile_fine else None
         # 调试标记：只要进入此方法就创建标记文件
         try:
             with open(_CPU_ATTENTION_EXECUTED_FLAG, "w") as f:
                 f.write("1")
         except Exception:
             pass
+        if fine_start is not None:
+            _heter_profile_record(
+                "cpu_attention_marker_file",
+                time.perf_counter() - fine_start,
+                self.layer_name,
+            )
+            fine_start = time.perf_counter()
         cpu_k_cache, cpu_v_cache = self.cpu_kv_cache.unbind(0)
+        if fine_start is not None:
+            _heter_profile_record(
+                "cpu_attention_kv_cache_unbind",
+                time.perf_counter() - fine_start,
+                self.layer_name,
+            )
+            fine_start = time.perf_counter()
         alibi_slopes = cpu_metadata.get('alibi_slopes')
         scheduler_metadata = cpu_metadata.get('scheduler_metadata', torch.empty(0))
+        if fine_start is not None:
+            _heter_profile_record(
+                "cpu_attention_metadata_get",
+                time.perf_counter() - fine_start,
+                self.layer_name,
+            )
+            fine_start = time.perf_counter()
         cpu_attn_ops = _heter_cpu_attn_ops()
+        if fine_start is not None:
+            _heter_profile_record(
+                "cpu_attention_ops_lookup",
+                time.perf_counter() - fine_start,
+                self.layer_name,
+            )
+            fine_start = time.perf_counter()
         if cpu_attn_ops is not None:
             sliding_window_left, sliding_window_right = (
                 _heter_cpu_sliding_window_pair(self.sliding_window)
@@ -1171,6 +1354,12 @@ class Attention(nn.Module, AttentionLayerBase):
                 getattr(cpu_attn_ops, "attention_with_kv_cache", None),
             )
             assert attention_with_kv_cache is not None
+            if fine_start is not None:
+                _heter_profile_record(
+                    "cpu_attention_arg_prepare",
+                    time.perf_counter() - fine_start,
+                    self.layer_name,
+                )
             attention_with_kv_cache(
                 query_cpu,
                 cpu_k_cache,
@@ -1456,6 +1645,8 @@ def unified_attention_with_output(
         and (self.cpu_kv_cache is not None)
     ):
         profile_decode_start = time.perf_counter() if _heter_profile_enabled() else None
+        profile_fine = _heter_profile_fine_enabled()
+        profile_gap_start = time.perf_counter() if profile_decode_start is not None else None
         # 1. 等待该层之前 Prefill 的 async D2H 完成
         if self._d2h_stream is not None:
             profile_start = time.perf_counter() if profile_decode_start is not None else None
@@ -1466,12 +1657,26 @@ def unified_attention_with_output(
                     time.perf_counter() - profile_start,
                     self.layer_name,
                 )
+        if profile_fine and profile_gap_start is not None:
+            _heter_profile_record(
+                "decode_gap_after_wait_before_kv",
+                time.perf_counter() - profile_gap_start,
+                self.layer_name,
+            )
+        profile_gap_start = time.perf_counter() if profile_decode_start is not None else None
 
         # 2. K/V 搬到 CPU，写入 CPU Paged Cache
         if key is not None and value is not None and attn_metadata is not None:
             slot_mapping = getattr(attn_metadata, 'slot_mapping', None)
             if slot_mapping is not None:
                 self._decode_kv_to_cpu(key, value, slot_mapping)
+        if profile_fine and profile_gap_start is not None:
+            _heter_profile_record(
+                "decode_gap_after_kv_before_query",
+                time.perf_counter() - profile_gap_start,
+                self.layer_name,
+            )
+        profile_gap_start = time.perf_counter() if profile_decode_start is not None else None
 
         # 3. Q 搬到 CPU，分配 CPU output
         profile_start = time.perf_counter() if profile_decode_start is not None else None
@@ -1484,6 +1689,13 @@ def unified_attention_with_output(
                 query_tokens=int(query.shape[0]),
             )
             profile_start = time.perf_counter()
+        if profile_fine and profile_gap_start is not None:
+            _heter_profile_record(
+                "decode_gap_after_query_before_alloc",
+                time.perf_counter() - profile_gap_start,
+                self.layer_name,
+            )
+        profile_gap_start = time.perf_counter() if profile_decode_start is not None else None
         output_cpu = torch.empty(
             (query.shape[0], self.num_heads, self.head_size_v),
             dtype=output.dtype,
@@ -1497,11 +1709,45 @@ def unified_attention_with_output(
                 self.layer_name,
                 query_tokens=int(query.shape[0]),
             )
+        if profile_fine and profile_gap_start is not None:
+            _heter_profile_record(
+                "decode_gap_after_alloc_before_metadata",
+                time.perf_counter() - profile_gap_start,
+                self.layer_name,
+            )
+        profile_gap_start = time.perf_counter() if profile_decode_start is not None else None
 
         # 4. 构造 CPU metadata 并执行 CPU Paged Attention
         if attn_metadata is not None:
             cpu_metadata = self._build_cpu_metadata(attn_metadata)
-            self._cpu_paged_attention(query_cpu, output_cpu, cpu_metadata)
+            if profile_fine and profile_gap_start is not None:
+                _heter_profile_record(
+                    "decode_gap_after_metadata_before_cpp",
+                    time.perf_counter() - profile_gap_start,
+                    self.layer_name,
+                )
+            profile_gap_start = time.perf_counter() if profile_decode_start is not None else None
+            if os.environ.get("VLLM_HETER_SKIP_CPU_ATTN_COMPUTE", "0") == "1":
+                profile_start = (
+                    time.perf_counter() if profile_decode_start is not None else None
+                )
+                output_cpu.zero_()
+                if profile_start is not None:
+                    _heter_profile_record(
+                        "cpu_attention_skip_compute_zero",
+                        time.perf_counter() - profile_start,
+                        self.layer_name,
+                        query_tokens=int(query_cpu.shape[0]),
+                    )
+            else:
+                self._cpu_paged_attention(query_cpu, output_cpu, cpu_metadata)
+            if profile_fine and profile_gap_start is not None:
+                _heter_profile_record(
+                    "decode_gap_after_cpp_before_h2d",
+                    time.perf_counter() - profile_gap_start,
+                    self.layer_name,
+                )
+            profile_gap_start = time.perf_counter() if profile_decode_start is not None else None
 
         # 5. Output 搬回 GPU
         profile_start = time.perf_counter() if profile_decode_start is not None else None
@@ -1513,6 +1759,12 @@ def unified_attention_with_output(
                 self.layer_name,
                 query_tokens=int(query.shape[0]),
             )
+            if profile_fine and profile_gap_start is not None:
+                _heter_profile_record(
+                    "decode_gap_after_h2d_before_total",
+                    time.perf_counter() - profile_gap_start,
+                    self.layer_name,
+                )
             _heter_profile_record(
                 "decode_cpu_path_layer_total",
                 time.perf_counter() - profile_decode_start,

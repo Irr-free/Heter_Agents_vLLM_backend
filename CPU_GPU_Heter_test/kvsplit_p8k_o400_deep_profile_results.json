@@ -1,0 +1,363 @@
+{
+  "timestamp_utc": "2026-05-19 15:22:39 UTC",
+  "model": "/home/zb/data/model_data/models/LLM-Research/Meta-Llama-3.1-8B-Instruct",
+  "prompt_len": 8000,
+  "output_len": 400,
+  "batch_size": 1,
+  "omp_threads": 120,
+  "cpu_affinity": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123",
+  "cpp_attention_lib": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/vllm/libs/libvllm_heter_cpu_attn.so",
+  "architecture_probe": {
+    "omp_threads": 120,
+    "sequential_read_gib_s": 65.5556,
+    "random_pointer_chase_ns": 41.8967,
+    "omp_barrier_us": 78.3617,
+    "contended_atomic_fetch_add_ns": 68.6638
+  },
+  "direct_one_layer": {
+    "kind": "direct",
+    "mode": "one_layer_reuse",
+    "label": "Direct C++ one-layer reuse",
+    "prompt_len_target": 8000,
+    "output_len_target": 400,
+    "layer_count": 1,
+    "wall_s": 0.31675895117223263,
+    "scheduler_s": 0.003795069642364979,
+    "attention_outer_s": 0.31030321028083563,
+    "metadata": {
+      "isa": 2,
+      "workitem_group_num": 13,
+      "reduction_item_num": 1,
+      "reduction_split_num": 13,
+      "thread_num": 120,
+      "effective_thread_num": 13,
+      "split_kv_q_token_num_threshold": 1,
+      "attention_scratchpad_size_per_thread": 1048704,
+      "reduction_scratchpad_size_per_kv_head": 27200
+    },
+    "inner": {
+      "event_count": 400,
+      "elapsed_total_s": 0.300024564,
+      "stage_totals_s": {
+        "split_flag_reset": 0.001713895,
+        "task_acquire": 0.220608132,
+        "q_copy": 0.023394741,
+        "qk_gemm": 1.571256518,
+        "qk_block_lookup": 0.051527279,
+        "qk_tile_gemm": 1.4096546,
+        "softcap": 0.0,
+        "alibi": 0.0,
+        "mask": 0.002763415,
+        "softmax": 0.641260291,
+        "pv_gemm": 2.373489146,
+        "pv_block_lookup": 0.053731689,
+        "pv_tile_gemm": 1.838499177,
+        "final_output": 0.000631444,
+        "partial_output": 0.016240511,
+        "reduce_splits": 0.393327858,
+        "split_barrier_wait": 18.052606072,
+        "reduce_flag_wait": 0.374035401
+      },
+      "stage_calls": {
+        "split_flag_reset": 48000,
+        "task_acquire": 92928,
+        "q_copy": 41728,
+        "qk_gemm": 41728,
+        "qk_block_lookup": 1641600,
+        "qk_tile_gemm": 1641600,
+        "softcap": 0,
+        "alibi": 0,
+        "mask": 41728,
+        "softmax": 41728,
+        "pv_gemm": 41728,
+        "pv_block_lookup": 1641600,
+        "pv_tile_gemm": 13132800,
+        "final_output": 3200,
+        "partial_output": 41728,
+        "reduce_splits": 3200,
+        "split_barrier_wait": 48000,
+        "reduce_flag_wait": 41728
+      },
+      "components_s": {
+        "qk_tile_gemm": 1.4096546,
+        "pv_tile_gemm": 1.838499177,
+        "softmax": 0.641260291,
+        "output_reduce": 0.410199813,
+        "block_lookup": 0.105258968,
+        "task_acquire": 0.220608132,
+        "sync_wait": 18.426641473,
+        "loop_other": 0.591332919,
+        "q_copy": 0.023394741,
+        "mask": 0.002763415
+      },
+      "component_total_s": 23.669613529,
+      "components_share": {
+        "qk_tile_gemm": 0.059555454856619935,
+        "pv_tile_gemm": 0.07767339229039256,
+        "softmax": 0.027092131868326798,
+        "output_reduce": 0.017330228586006417,
+        "block_lookup": 0.004447008307551653,
+        "task_acquire": 0.009320309844928858,
+        "sync_wait": 0.7784935504089954,
+        "loop_other": 0.02498278724642036,
+        "q_copy": 0.0009883871137708596,
+        "mask": 0.00011674947698720409
+      }
+    },
+    "cache_bytes_total": 34471936,
+    "estimated_logical_kv_gib": 12.512969970703125,
+    "estimated_logical_kv_gib_per_s": 41.706484975353966
+  },
+  "direct_32_layer": {
+    "kind": "direct",
+    "mode": "thirty_two_layer_working_set",
+    "label": "Direct C++ 32-layer working set",
+    "prompt_len_target": 8000,
+    "output_len_target": 400,
+    "layer_count": 32,
+    "wall_s": 7.2214111890643835,
+    "scheduler_s": 0.01636242214590311,
+    "attention_outer_s": 7.188058830797672,
+    "metadata": {
+      "isa": 2,
+      "workitem_group_num": 13,
+      "reduction_item_num": 1,
+      "reduction_split_num": 13,
+      "thread_num": 120,
+      "effective_thread_num": 13,
+      "split_kv_q_token_num_threshold": 1,
+      "attention_scratchpad_size_per_thread": 1048704,
+      "reduction_scratchpad_size_per_kv_head": 27200
+    },
+    "inner": {
+      "event_count": 12800,
+      "elapsed_total_s": 6.787152348,
+      "stage_totals_s": {
+        "split_flag_reset": 0.047655608,
+        "task_acquire": 6.247339936,
+        "q_copy": 0.497650508,
+        "qk_gemm": 144.77018954,
+        "qk_block_lookup": 1.672024356,
+        "qk_tile_gemm": 139.510240431,
+        "softcap": 0.0,
+        "alibi": 0.0,
+        "mask": 0.085225966,
+        "softmax": 21.695862748,
+        "pv_gemm": 147.484827704,
+        "pv_block_lookup": 1.554834399,
+        "pv_tile_gemm": 131.503456977,
+        "final_output": 0.019431287,
+        "partial_output": 0.477660495,
+        "reduce_splits": 26.796971145,
+        "split_barrier_wait": 209.382934123,
+        "reduce_flag_wait": 26.215429003
+      },
+      "stage_calls": {
+        "split_flag_reset": 1536000,
+        "task_acquire": 2973696,
+        "q_copy": 1335296,
+        "qk_gemm": 1335296,
+        "qk_block_lookup": 52531200,
+        "qk_tile_gemm": 52531200,
+        "softcap": 0,
+        "alibi": 0,
+        "mask": 1335296,
+        "softmax": 1335296,
+        "pv_gemm": 1335296,
+        "pv_block_lookup": 52531200,
+        "pv_tile_gemm": 420249600,
+        "final_output": 102400,
+        "partial_output": 1335296,
+        "reduce_splits": 102400,
+        "split_barrier_wait": 1536000,
+        "reduce_flag_wait": 1335296
+      },
+      "components_s": {
+        "qk_tile_gemm": 139.510240431,
+        "pv_tile_gemm": 131.503456977,
+        "softmax": 21.695862748,
+        "output_reduce": 27.294062927,
+        "block_lookup": 3.226858755,
+        "task_acquire": 6.247339936,
+        "sync_wait": 235.598363126,
+        "loop_other": 18.014461081,
+        "q_copy": 0.497650508,
+        "mask": 0.085225966
+      },
+      "component_total_s": 583.673522455,
+      "components_share": {
+        "qk_tile_gemm": 0.2390210195662181,
+        "pv_tile_gemm": 0.22530310510554064,
+        "softmax": 0.03717122999985442,
+        "output_reduce": 0.046762551112817206,
+        "block_lookup": 0.005528533727943406,
+        "task_acquire": 0.010703483532579905,
+        "sync_wait": 0.40364750851648257,
+        "loop_other": 0.03086393401096737,
+        "q_copy": 0.0008526179256972683,
+        "mask": 0.0001460165018990916
+      }
+    },
+    "cache_bytes_total": 1103101952,
+    "estimated_logical_kv_gib": 400.4150390625,
+    "estimated_logical_kv_gib_per_s": 58.99602934071342
+  },
+  "server_profile": {
+    "kind": "server",
+    "label": "vLLM server KV split OMP120",
+    "prompt_len_target": 8000,
+    "output_len_target": 400,
+    "wall_s": 25.434309102594852,
+    "prompt_tokens": 8001,
+    "completion_tokens": 400,
+    "finish_reason": "length",
+    "inner": {
+      "event_count": 12768,
+      "elapsed_total_s": 4.825115292,
+      "stage_totals_s": {
+        "split_flag_reset": 0.02325032,
+        "task_acquire": 2.243902832,
+        "q_copy": 0.366807962,
+        "qk_gemm": 99.372470287,
+        "qk_block_lookup": 1.385055021,
+        "qk_tile_gemm": 95.178289395,
+        "softcap": 0.0,
+        "alibi": 0.0,
+        "mask": 0.044635152,
+        "softmax": 14.812738392,
+        "pv_gemm": 119.851747878,
+        "pv_block_lookup": 1.282105023,
+        "pv_tile_gemm": 106.18260516,
+        "final_output": 0.016828886,
+        "partial_output": 0.131795937,
+        "reduce_splits": 13.936628141,
+        "split_barrier_wait": 8.674727458,
+        "reduce_flag_wait": 13.593930707
+      },
+      "stage_calls": {
+        "split_flag_reset": 817152,
+        "task_acquire": 1736448,
+        "q_copy": 817152,
+        "qk_gemm": 817152,
+        "qk_block_lookup": 52402944,
+        "qk_tile_gemm": 52402944,
+        "softcap": 0,
+        "alibi": 0,
+        "mask": 817152,
+        "softmax": 817152,
+        "pv_gemm": 817152,
+        "pv_block_lookup": 52402944,
+        "pv_tile_gemm": 419223552,
+        "final_output": 102144,
+        "partial_output": 817152,
+        "reduce_splits": 102144,
+        "split_barrier_wait": 817152,
+        "reduce_flag_wait": 817152
+      },
+      "components_s": {
+        "qk_tile_gemm": 95.178289395,
+        "pv_tile_gemm": 106.18260516,
+        "softmax": 14.812738392,
+        "output_reduce": 14.085252964,
+        "block_lookup": 2.667160044,
+        "task_acquire": 2.243902832,
+        "sync_wait": 22.268658165,
+        "loop_other": 15.196163566,
+        "q_copy": 0.366807962,
+        "mask": 0.044635152
+      },
+      "component_total_s": 273.046213632,
+      "components_share": {
+        "qk_tile_gemm": 0.34857941492379463,
+        "pv_tile_gemm": 0.3888814415244314,
+        "softmax": 0.05424993152244907,
+        "output_reduce": 0.051585600754689466,
+        "block_lookup": 0.009768163449410377,
+        "task_acquire": 0.008218033138610874,
+        "sync_wait": 0.08155637050881337,
+        "loop_other": 0.05565418162685361,
+        "q_copy": 0.0013433914981672958,
+        "mask": 0.00016347105277994203
+      }
+    },
+    "outer_summary": {
+      "gpu_attention_forward": {
+        "count": 32,
+        "total_s": 0.003401906229555607,
+        "avg_ms": 0.10630956967361271,
+        "max_ms": 0.4157163202762604
+      },
+      "prefill_kv_d2h_enqueue": {
+        "count": 32,
+        "total_s": 0.0042603714391589165,
+        "avg_ms": 0.13313660747371614,
+        "max_ms": 0.3383643925189972
+      },
+      "decode_wait_prefill_d2h": {
+        "count": 12768,
+        "total_s": 0.5299178902059793,
+        "avg_ms": 0.041503594157736474,
+        "max_ms": 0.18973182886838913
+      },
+      "decode_kv_d2h": {
+        "count": 12768,
+        "total_s": 0.742183200083673,
+        "avg_ms": 0.058128383465199954,
+        "max_ms": 0.3774864599108696
+      },
+      "decode_kv_cache_write_total": {
+        "count": 12768,
+        "total_s": 0.6839788034558296,
+        "avg_ms": 0.05356976844108941,
+        "max_ms": 4.014858976006508
+      },
+      "decode_query_d2h": {
+        "count": 12768,
+        "total_s": 0.24713623709976673,
+        "avg_ms": 0.019355908294154664,
+        "max_ms": 0.18738768994808197
+      },
+      "decode_output_cpu_alloc": {
+        "count": 12768,
+        "total_s": 0.13976425677537918,
+        "avg_ms": 0.010946448682282204,
+        "max_ms": 4.863210953772068
+      },
+      "decode_cpu_scheduler_metadata": {
+        "count": 12768,
+        "total_s": 0.30990008637309074,
+        "avg_ms": 0.024271623306163122,
+        "max_ms": 0.16673002392053604
+      },
+      "decode_metadata_d2h": {
+        "count": 12768,
+        "total_s": 1.4237830368801951,
+        "avg_ms": 0.11151182932958922,
+        "max_ms": 1.151401549577713
+      },
+      "cpu_attention_cpp_total": {
+        "count": 12768,
+        "total_s": 6.605711268261075,
+        "avg_ms": 0.5173646043437559,
+        "max_ms": 2.0544733852148056
+      },
+      "decode_output_h2d": {
+        "count": 12768,
+        "total_s": 0.7145357057452202,
+        "avg_ms": 0.05596300953518329,
+        "max_ms": 0.3063082695007324
+      },
+      "decode_cpu_path_layer_total": {
+        "count": 12768,
+        "total_s": 14.550031498074532,
+        "avg_ms": 1.1395701361273913,
+        "max_ms": 26.993160136044025
+      }
+    },
+    "raw_inner_events": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/kvsplit_p8k_o400_server_inner_events.jsonl",
+    "raw_outer_events": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/kvsplit_p8k_o400_server_outer_events.jsonl",
+    "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/kvsplit_p8k_o400_server.log",
+    "estimated_logical_kv_gib": 400.4150390625,
+    "estimated_logical_kv_gib_per_s": 82.9855899456713
+  }
+}

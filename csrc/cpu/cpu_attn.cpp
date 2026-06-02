@@ -1,5 +1,80 @@
 #include "cpu_attn_dispatch_generated.h"
 
+#include <cstdlib>
+#include <fstream>
+#include <mutex>
+
+namespace {
+
+std::mutex heter_cpu_attn_inner_profile_mutex;
+
+void write_stage_json(std::ofstream& out, const char* name, const int64_t ns,
+                      const int64_t calls, bool& first) {
+  if (!first) {
+    out << ",";
+  }
+  first = false;
+  out << "\"" << name << "\":{\"ns\":" << ns << ",\"calls\":" << calls
+      << "}";
+}
+
+void write_cpu_attention_inner_profile(
+    const char* path, const cpu_attention::AttentionInput& input,
+    const cpu_attention::AttentionInnerProfileData& profile,
+    const int64_t elapsed_ns) {
+  std::lock_guard<std::mutex> lock(heter_cpu_attn_inner_profile_mutex);
+  std::ofstream out(path, std::ios::app);
+  if (!out.is_open()) {
+    return;
+  }
+  out << "{\"event\":\"cpu_attention_inner_profile\"";
+  out << ",\"elapsed_ns\":" << elapsed_ns;
+  out << ",\"num_tokens\":" << input.num_tokens;
+  out << ",\"num_heads\":" << input.num_heads;
+  out << ",\"num_kv_heads\":" << input.num_kv_heads;
+  out << ",\"block_size\":" << input.block_size;
+  out << ",\"stages\":{";
+  bool first = true;
+  write_stage_json(out, "split_flag_reset", profile.split_flag_reset_ns,
+                   profile.split_flag_reset_calls, first);
+  write_stage_json(out, "task_acquire", profile.task_acquire_ns,
+                   profile.task_acquire_calls, first);
+  write_stage_json(out, "q_copy", profile.q_copy_ns, profile.q_copy_calls,
+                   first);
+  write_stage_json(out, "qk_gemm", profile.qk_gemm_ns,
+                   profile.qk_gemm_calls, first);
+  write_stage_json(out, "qk_block_lookup", profile.qk_block_lookup_ns,
+                   profile.qk_block_lookup_calls, first);
+  write_stage_json(out, "qk_tile_gemm", profile.qk_tile_gemm_ns,
+                   profile.qk_tile_gemm_calls, first);
+  write_stage_json(out, "softcap", profile.softcap_ns, profile.softcap_calls,
+                   first);
+  write_stage_json(out, "alibi", profile.alibi_ns, profile.alibi_calls,
+                   first);
+  write_stage_json(out, "mask", profile.mask_ns, profile.mask_calls, first);
+  write_stage_json(out, "softmax", profile.softmax_ns,
+                   profile.softmax_calls, first);
+  write_stage_json(out, "pv_gemm", profile.pv_gemm_ns,
+                   profile.pv_gemm_calls, first);
+  write_stage_json(out, "pv_block_lookup", profile.pv_block_lookup_ns,
+                   profile.pv_block_lookup_calls, first);
+  write_stage_json(out, "pv_tile_gemm", profile.pv_tile_gemm_ns,
+                   profile.pv_tile_gemm_calls, first);
+  write_stage_json(out, "final_output", profile.final_output_ns,
+                   profile.final_output_calls, first);
+  write_stage_json(out, "partial_output", profile.partial_output_ns,
+                   profile.partial_output_calls, first);
+  write_stage_json(out, "reduce_splits", profile.reduce_splits_ns,
+                   profile.reduce_splits_calls, first);
+  write_stage_json(out, "split_barrier_wait", profile.split_barrier_wait_ns,
+                   profile.split_barrier_wait_calls, first);
+  write_stage_json(out, "reduce_flag_wait", profile.reduce_flag_wait_ns,
+                   profile.reduce_flag_wait_calls, first);
+  out << "}}\n";
+}
+
+}  // namespace
+
 torch::Tensor get_scheduler_metadata(
     const int64_t num_req, const int64_t num_heads_q,
     const int64_t num_heads_kv, const int64_t head_dim,
@@ -177,6 +252,16 @@ void cpu_attention_with_kv_cache(
   }
   float softcap_fp32 = softcap;
   input.softcap = softcap_fp32;
+  const char* inner_profile_path =
+      std::getenv("VLLM_HETER_CPU_ATTN_INNER_PROFILE_PATH");
+  cpu_attention::AttentionInnerProfileData inner_profile;
+  input.inner_profile =
+      (inner_profile_path != nullptr && inner_profile_path[0] != '\0')
+          ? &inner_profile
+          : nullptr;
+  const int64_t inner_profile_start_ns =
+      input.inner_profile != nullptr ? cpu_attention::attention_profile_now_ns()
+                                     : 0;
 
   VLLM_DISPATCH_FLOATING_TYPES(
       query.scalar_type(), "cpu_attention_with_kv_cache", [&]() {
@@ -186,4 +271,9 @@ void cpu_attention_with_kv_cache(
           mainloop(&input);
         });
       });
+  if (input.inner_profile != nullptr) {
+    write_cpu_attention_inner_profile(
+        inner_profile_path, input, inner_profile,
+        cpu_attention::attention_profile_now_ns() - inner_profile_start_ns);
+  }
 }

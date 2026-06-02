@@ -1,0 +1,318 @@
+{
+  "timestamp_utc": "2026-05-28 12:52:39 UTC",
+  "model": "/home/zb/data/model_data/models/LLM-Research/Meta-Llama-3.1-8B-Instruct",
+  "prompt_lens": [
+    2000,
+    4000,
+    8000
+  ],
+  "output_lens": [
+    200,
+    400,
+    600
+  ],
+  "batch_size": 1,
+  "gpu_memory_utilization": "0.25",
+  "max_model_len": "10000",
+  "metric": "completion_tokens / request_wall_time",
+  "prefix_cache_policy": "default vLLM behavior; each measured workload uses a fresh server",
+  "rows": [
+    {
+      "mode": "gpu",
+      "prompt_len_target": 2000,
+      "output_len_target": 200,
+      "request_wall_s": 3.180732895969413,
+      "completion_tokens_per_s": 62.87859010526713,
+      "usage": {
+        "prompt_tokens": 2001,
+        "total_tokens": 2201,
+        "completion_tokens": 200,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p2000_o200_server.log"
+    },
+    {
+      "mode": "gpu",
+      "prompt_len_target": 2000,
+      "output_len_target": 400,
+      "request_wall_s": 4.64164303499274,
+      "completion_tokens_per_s": 86.17638129094641,
+      "usage": {
+        "prompt_tokens": 2001,
+        "total_tokens": 2401,
+        "completion_tokens": 400,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p2000_o400_server.log"
+    },
+    {
+      "mode": "gpu",
+      "prompt_len_target": 2000,
+      "output_len_target": 600,
+      "request_wall_s": 6.8762595420121215,
+      "completion_tokens_per_s": 87.25674130450707,
+      "usage": {
+        "prompt_tokens": 2001,
+        "total_tokens": 2601,
+        "completion_tokens": 600,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p2000_o600_server.log"
+    },
+    {
+      "mode": "gpu",
+      "prompt_len_target": 4000,
+      "output_len_target": 200,
+      "request_wall_s": 3.085282815969549,
+      "completion_tokens_per_s": 64.82387901841345,
+      "usage": {
+        "prompt_tokens": 4001,
+        "total_tokens": 4201,
+        "completion_tokens": 200,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p4000_o200_server.log"
+    },
+    {
+      "mode": "gpu",
+      "prompt_len_target": 4000,
+      "output_len_target": 400,
+      "request_wall_s": 5.885095143981744,
+      "completion_tokens_per_s": 67.968314906353,
+      "usage": {
+        "prompt_tokens": 4001,
+        "total_tokens": 4401,
+        "completion_tokens": 400,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p4000_o400_server.log"
+    },
+    {
+      "mode": "gpu",
+      "prompt_len_target": 4000,
+      "output_len_target": 600,
+      "request_wall_s": 8.36248039000202,
+      "completion_tokens_per_s": 71.74904717472887,
+      "usage": {
+        "prompt_tokens": 4001,
+        "total_tokens": 4601,
+        "completion_tokens": 600,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p4000_o600_server.log"
+    },
+    {
+      "mode": "gpu",
+      "prompt_len_target": 8000,
+      "output_len_target": 200,
+      "request_wall_s": 3.6673481939942576,
+      "completion_tokens_per_s": 54.535318006489014,
+      "usage": {
+        "prompt_tokens": 8001,
+        "total_tokens": 8201,
+        "completion_tokens": 200,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p8000_o200_server.log"
+    },
+    {
+      "mode": "gpu",
+      "prompt_len_target": 8000,
+      "output_len_target": 400,
+      "request_wall_s": 6.715783010004088,
+      "completion_tokens_per_s": 59.56118585191699,
+      "usage": {
+        "prompt_tokens": 8001,
+        "total_tokens": 8401,
+        "completion_tokens": 400,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p8000_o400_server.log"
+    },
+    {
+      "mode": "gpu",
+      "prompt_len_target": 8000,
+      "output_len_target": 600,
+      "request_wall_s": 9.368910969991703,
+      "completion_tokens_per_s": 64.04159479386443,
+      "usage": {
+        "prompt_tokens": 8001,
+        "total_tokens": 8601,
+        "completion_tokens": 600,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p8000_o600_server.log"
+    },
+    {
+      "mode": "heter",
+      "prompt_len_target": 2000,
+      "output_len_target": 200,
+      "request_wall_s": 26.000417508010287,
+      "completion_tokens_per_s": 7.6921841712112276,
+      "usage": {
+        "prompt_tokens": 2001,
+        "total_tokens": 2201,
+        "completion_tokens": 200,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p2000_o200_server.log",
+      "server_start_attempt": 1,
+      "omp_threads": 64,
+      "cpu_affinity": "0-63"
+    },
+    {
+      "mode": "heter",
+      "prompt_len_target": 2000,
+      "output_len_target": 400,
+      "request_wall_s": 16.506312160985544,
+      "completion_tokens_per_s": 24.233153723182536,
+      "usage": {
+        "prompt_tokens": 2001,
+        "total_tokens": 2401,
+        "completion_tokens": 400,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p2000_o400_server.log",
+      "server_start_attempt": 1,
+      "omp_threads": 64,
+      "cpu_affinity": "0-63"
+    },
+    {
+      "mode": "heter",
+      "prompt_len_target": 2000,
+      "output_len_target": 600,
+      "request_wall_s": 24.7957961789798,
+      "completion_tokens_per_s": 24.197650104441472,
+      "usage": {
+        "prompt_tokens": 2001,
+        "total_tokens": 2601,
+        "completion_tokens": 600,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p2000_o600_server.log",
+      "server_start_attempt": 1,
+      "omp_threads": 64,
+      "cpu_affinity": "0-63"
+    },
+    {
+      "mode": "heter",
+      "prompt_len_target": 4000,
+      "output_len_target": 200,
+      "request_wall_s": 9.624728436989244,
+      "completion_tokens_per_s": 20.779807067737167,
+      "usage": {
+        "prompt_tokens": 4001,
+        "total_tokens": 4201,
+        "completion_tokens": 200,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p4000_o200_server.log",
+      "server_start_attempt": 1,
+      "omp_threads": 64,
+      "cpu_affinity": "0-63"
+    },
+    {
+      "mode": "heter",
+      "prompt_len_target": 4000,
+      "output_len_target": 400,
+      "request_wall_s": 17.67248892498901,
+      "completion_tokens_per_s": 22.634050115849696,
+      "usage": {
+        "prompt_tokens": 4001,
+        "total_tokens": 4401,
+        "completion_tokens": 400,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p4000_o400_server.log",
+      "server_start_attempt": 1,
+      "omp_threads": 64,
+      "cpu_affinity": "0-63"
+    },
+    {
+      "mode": "heter",
+      "prompt_len_target": 4000,
+      "output_len_target": 600,
+      "request_wall_s": 25.936797002970707,
+      "completion_tokens_per_s": 23.133157110003914,
+      "usage": {
+        "prompt_tokens": 4001,
+        "total_tokens": 4601,
+        "completion_tokens": 600,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p4000_o600_server.log",
+      "server_start_attempt": 1,
+      "omp_threads": 64,
+      "cpu_affinity": "0-63"
+    },
+    {
+      "mode": "heter",
+      "prompt_len_target": 8000,
+      "output_len_target": 200,
+      "request_wall_s": 10.728612590988632,
+      "completion_tokens_per_s": 18.641739395827152,
+      "usage": {
+        "prompt_tokens": 8001,
+        "total_tokens": 8201,
+        "completion_tokens": 200,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p8000_o200_server.log",
+      "server_start_attempt": 1,
+      "omp_threads": 64,
+      "cpu_affinity": "0-63"
+    },
+    {
+      "mode": "heter",
+      "prompt_len_target": 8000,
+      "output_len_target": 400,
+      "request_wall_s": 20.167803940013982,
+      "completion_tokens_per_s": 19.83359225375942,
+      "usage": {
+        "prompt_tokens": 8001,
+        "total_tokens": 8401,
+        "completion_tokens": 400,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p8000_o400_server.log",
+      "server_start_attempt": 1,
+      "omp_threads": 64,
+      "cpu_affinity": "0-63"
+    },
+    {
+      "mode": "heter",
+      "prompt_len_target": 8000,
+      "output_len_target": 600,
+      "request_wall_s": 30.07274720299756,
+      "completion_tokens_per_s": 19.951619183637263,
+      "usage": {
+        "prompt_tokens": 8001,
+        "total_tokens": 8601,
+        "completion_tokens": 600,
+        "prompt_tokens_details": null
+      },
+      "finish_reason": "length",
+      "server_log": "/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p8000_o600_server.log",
+      "server_start_attempt": 1,
+      "omp_threads": 64,
+      "cpu_affinity": "0-63"
+    }
+  ]
+}

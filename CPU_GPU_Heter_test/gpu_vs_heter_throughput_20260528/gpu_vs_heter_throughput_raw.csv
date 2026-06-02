@@ -1,0 +1,19 @@
+mode,prompt_len_target,output_len_target,request_wall_s,completion_tokens_per_s,prompt_tokens,completion_tokens,total_tokens,finish_reason,server_log
+gpu,2000,200,3.180732895969413,62.87859010526713,2001,200,2201,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p2000_o200_server.log
+gpu,2000,400,4.64164303499274,86.17638129094641,2001,400,2401,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p2000_o400_server.log
+gpu,2000,600,6.8762595420121215,87.25674130450707,2001,600,2601,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p2000_o600_server.log
+gpu,4000,200,3.085282815969549,64.82387901841345,4001,200,4201,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p4000_o200_server.log
+gpu,4000,400,5.885095143981744,67.968314906353,4001,400,4401,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p4000_o400_server.log
+gpu,4000,600,8.36248039000202,71.74904717472887,4001,600,4601,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p4000_o600_server.log
+gpu,8000,200,3.6673481939942576,54.535318006489014,8001,200,8201,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p8000_o200_server.log
+gpu,8000,400,6.715783010004088,59.56118585191699,8001,400,8401,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p8000_o400_server.log
+gpu,8000,600,9.368910969991703,64.04159479386443,8001,600,8601,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/gpu_p8000_o600_server.log
+heter,2000,200,26.000417508010287,7.6921841712112276,2001,200,2201,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p2000_o200_server.log
+heter,2000,400,16.506312160985544,24.233153723182536,2001,400,2401,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p2000_o400_server.log
+heter,2000,600,24.7957961789798,24.197650104441472,2001,600,2601,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p2000_o600_server.log
+heter,4000,200,9.624728436989244,20.779807067737167,4001,200,4201,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p4000_o200_server.log
+heter,4000,400,17.67248892498901,22.634050115849696,4001,400,4401,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p4000_o400_server.log
+heter,4000,600,25.936797002970707,23.133157110003914,4001,600,4601,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p4000_o600_server.log
+heter,8000,200,10.728612590988632,18.641739395827152,8001,200,8201,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p8000_o200_server.log
+heter,8000,400,20.167803940013982,19.83359225375942,8001,400,8401,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p8000_o400_server.log
+heter,8000,600,30.07274720299756,19.951619183637263,8001,600,8601,length,/mnt/raid5/zb_data/HeterAgents/vLLM server/vllm/CPU_GPU_Heter_test/gpu_vs_heter_throughput_20260528/heter_p8000_o600_server.log

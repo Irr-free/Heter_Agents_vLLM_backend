@@ -78,7 +78,7 @@ from vllm.v1.outputs import ModelRunnerOutput
 from vllm.v1.request import Request, RequestStatus
 from vllm.v1.serial_utils import MsgpackDecoder, MsgpackEncoder
 from vllm.v1.structured_output import StructuredOutputManager
-from vllm.v1.utils import compute_iteration_details
+from vllm.v1.utils import compute_iteration_details, heter_request_profile_record
 from vllm.version import __version__ as VLLM_VERSION
 
 logger = init_logger(__name__)
@@ -410,22 +410,78 @@ class EngineCore:
         # or finished and not yet removed from the batch.
         if not self.scheduler.has_requests():
             return {}, False
+        profile_step_start = time.perf_counter()
+        profile_start = time.perf_counter()
         scheduler_output = self.scheduler.schedule()
+        heter_request_profile_record(
+            "engine_core_schedule",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+            scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
+        )
+        profile_start = time.perf_counter()
         future = self.model_executor.execute_model(scheduler_output, non_block=True)
+        heter_request_profile_record(
+            "engine_core_execute_model_submit",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+            scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
+        )
+        profile_start = time.perf_counter()
         grammar_output = self.scheduler.get_grammar_bitmask(scheduler_output)
+        heter_request_profile_record(
+            "engine_core_get_grammar_bitmask",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+            scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
+        )
         with (
             self.log_error_detail(scheduler_output),
             self.log_iteration_details(scheduler_output),
         ):
+            profile_start = time.perf_counter()
             model_output = future.result()
+            heter_request_profile_record(
+                "engine_core_wait_execute_model_future",
+                time.perf_counter() - profile_start,
+                scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+                scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
+            )
             if model_output is None:
+                profile_start = time.perf_counter()
                 model_output = self.model_executor.sample_tokens(grammar_output)
+                heter_request_profile_record(
+                    "engine_core_sample_tokens_call",
+                    time.perf_counter() - profile_start,
+                    scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+                    scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
+                )
 
         # Before processing the model output, process any aborts that happened
         # during the model execution.
+        profile_start = time.perf_counter()
         self._process_aborts_queue()
+        heter_request_profile_record(
+            "engine_core_process_aborts",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+            scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
+        )
+        profile_start = time.perf_counter()
         engine_core_outputs = self.scheduler.update_from_output(
             scheduler_output, model_output
+        )
+        heter_request_profile_record(
+            "engine_core_scheduler_update_from_output",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+            scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
+        )
+        heter_request_profile_record(
+            "engine_core_step_total",
+            time.perf_counter() - profile_step_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+            scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
         )
 
         return engine_core_outputs, scheduler_output.total_num_scheduled_tokens > 0
@@ -468,10 +524,25 @@ class EngineCore:
         model_executed = False
         deferred_scheduler_output = None
         if self.scheduler.has_requests():
+            profile_step_start = time.perf_counter()
+            profile_start = time.perf_counter()
             scheduler_output = self.scheduler.schedule()
+            heter_request_profile_record(
+                "engine_core_schedule",
+                time.perf_counter() - profile_start,
+                scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+                scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
+            )
             with self.log_error_detail(scheduler_output):
+                profile_start = time.perf_counter()
                 exec_future = self.model_executor.execute_model(
                     scheduler_output, non_block=True
+                )
+                heter_request_profile_record(
+                    "engine_core_execute_model_submit",
+                    time.perf_counter() - profile_start,
+                    scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+                    scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
                 )
             if self.is_ec_consumer:
                 model_executed = scheduler_output.total_num_scheduled_tokens > 0
@@ -483,11 +554,25 @@ class EngineCore:
                 if not scheduler_output.pending_structured_output_tokens:
                     # We aren't waiting for any tokens, get any grammar output
                     # and sample immediately.
+                    profile_start = time.perf_counter()
                     grammar_output = self.scheduler.get_grammar_bitmask(
                         scheduler_output
                     )
+                    heter_request_profile_record(
+                        "engine_core_get_grammar_bitmask",
+                        time.perf_counter() - profile_start,
+                        scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+                        scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
+                    )
+                    profile_start = time.perf_counter()
                     future = self.model_executor.sample_tokens(
                         grammar_output, non_block=True
+                    )
+                    heter_request_profile_record(
+                        "engine_core_sample_tokens_call_submit",
+                        time.perf_counter() - profile_start,
+                        scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+                        scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
                     )
                 else:
                     # We need to defer sampling until we have processed the model output
@@ -497,6 +582,12 @@ class EngineCore:
             if not deferred_scheduler_output:
                 # Add this step's future to the queue.
                 batch_queue.appendleft((future, scheduler_output, exec_future))
+                heter_request_profile_record(
+                    "engine_core_step_enqueue_total",
+                    time.perf_counter() - profile_step_start,
+                    scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+                    scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
+                )
                 if (
                     model_executed
                     and len(batch_queue) < self.batch_queue_size
@@ -518,7 +609,14 @@ class EngineCore:
             self.log_error_detail(scheduler_output),
             self.log_iteration_details(scheduler_output),
         ):
+            profile_start = time.perf_counter()
             model_output = future.result()
+            heter_request_profile_record(
+                "engine_core_wait_model_or_sample_future",
+                time.perf_counter() - profile_start,
+                scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+                scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
+            )
             if model_output is None:
                 # None from sample_tokens() implies that the original execute_model()
                 # call failed - raise that exception.
@@ -527,9 +625,23 @@ class EngineCore:
 
         # Before processing the model output, process any aborts that happened
         # during the model execution.
+        profile_start = time.perf_counter()
         self._process_aborts_queue()
+        heter_request_profile_record(
+            "engine_core_process_aborts",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+            scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
+        )
+        profile_start = time.perf_counter()
         engine_core_outputs = self.scheduler.update_from_output(
             scheduler_output, model_output
+        )
+        heter_request_profile_record(
+            "engine_core_scheduler_update_from_output",
+            time.perf_counter() - profile_start,
+            scheduled_tokens=int(scheduler_output.total_num_scheduled_tokens),
+            scheduled_reqs=len(scheduler_output.num_scheduled_tokens),
         )
 
         # NOTE(nick): We can either handle the deferred tasks here or save
